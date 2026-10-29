@@ -5,7 +5,10 @@ from store import load_results, save_results
 from render import write_html
 import webbrowser
 
-
+# Settings: one label per Gmail account (token saved as token_<label>.json)
+ACCOUNTS = ("work", "personal", "school")
+QUERY = "in:inbox newer_than:1d"   # any Gmail search query
+LIMIT = 20                        # max emails per account per run
 
 
 prompt_instructions = """Rate the priority of this email for a college CS student.
@@ -38,12 +41,14 @@ def classify(email):
     return answer["priority"], answer["reason"]
 
 
-def run_triage(accounts=("work", "personal", "school"), query="in:inbox newer_than:1d", limit=1):
+def run_triage(accounts=ACCOUNTS, query=QUERY, limit=LIMIT):
     results = load_results()
     seen = {(r["account"], r["id"]) for r in results}
 
-    for account in accounts:
-        svc = get_service(account)
+    # sign in to every account first, so logins don't wait on classification
+    services = {account: get_service(account) for account in accounts}
+
+    for account, svc in services.items():
         for e in get_recent_emails(svc, query, limit):
             if (account, e["id"]) in seen:
                 continue

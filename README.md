@@ -8,8 +8,8 @@ Email content never leaves your machine: the only network calls are the Gmail AP
 
 1. `gmail_client.py` fetches recent inbox emails for each account (`gmail.readonly` scope).
 2. `triage.py` sends each email to the local model and gets back a priority and a one-line reason.
-3. `store.py` saves results to `results.json` so emails aren't classified twice.
-4. `render.py` builds `digest.html`, grouped by priority and account.
+3. `store.py` saves results to `data/results.json` so emails aren't classified twice.
+4. `render.py` builds `data/digest.html`, grouped by priority and account.
 
 ## Setup
 
@@ -68,15 +68,17 @@ You need your own OAuth client. It's free and takes about 5 minutes.
 
 ### 5. Configure your accounts
 
-Accounts are set in `run_triage()` in `triage.py`:
+Edit the settings at the top of `triage.py`:
 
 ```python
-def run_triage(accounts=("work", "personal", "school"), query="in:inbox newer_than:1d", limit=1):
+ACCOUNTS = ("work", "personal", "school")
+QUERY = "in:inbox newer_than:1d"
+LIMIT = 20
 ```
 
-- `accounts`: one label per Gmail account. The labels are only names; use as many or as few as you like, e.g. `("personal",)`.
-- `query`: any Gmail search query, e.g. `in:inbox newer_than:2d` or `is:unread`.
-- `limit`: max emails fetched per account per run. Raise it (e.g. `25`) once everything works.
+- `ACCOUNTS`: one label per Gmail account. The labels are only names; use as many or as few as you like. For a single account, keep the trailing comma: `("personal",)`.
+- `QUERY`: any Gmail search query, e.g. `in:inbox newer_than:2d` or `is:unread`.
+- `LIMIT`: max emails fetched per account per run. Lower it while testing to save time.
 
 ### 6. First run and sign-in
 
@@ -86,13 +88,13 @@ python triage.py
 
 For each account label, a browser window opens to sign in:
 
-1. Sign in with the Gmail account that matches that label (accounts are asked in the order listed).
+1. Sign in with the Gmail account that matches that label (all sign-ins happen up front, in the order listed, before any emails are classified).
 2. You'll see **"Google hasn't verified this app"**. This is expected for your own private app. Click **Continue**.
 3. Allow read-only Gmail access.
 
-A token is saved as `token_<label>.json`, so later runs don't ask again.
+A token is saved as `data/token_<label>.json`, so later runs don't ask again.
 
-> **Tokens expire after 7 days** while the app is in **Testing** mode. If you get an auth error, delete the `token_<label>.json` file and sign in again.
+> **Tokens expire after 7 days** while the app is in **Testing** mode. If you get an auth error, delete `data/token_<label>.json` and sign in again.
 
 ## Usage
 
@@ -100,7 +102,7 @@ A token is saved as `token_<label>.json`, so later runs don't ask again.
 python triage.py
 ```
 
-This opens `digest.html` in your browser, classifies new emails (already classified ones are skipped), and refreshes the page as results come in.
+This opens `data/digest.html` in your browser, classifies new emails (already classified ones are skipped), and refreshes the page as results come in.
 
 ### Run it automatically (Windows Task Scheduler)
 
@@ -124,16 +126,16 @@ On macOS / Linux, use cron instead:
 | --- | --- |
 | `FileNotFoundError: credentials.json` | Download the OAuth client JSON (step 4) and put it in the project folder. |
 | `access_denied` or "app not available" on sign-in | Add that Gmail address under **Audience → Test users**. |
-| `invalid_grant` / token errors | Delete the `token_<label>.json` file and run again. |
+| `invalid_grant` / token errors | Delete `data/token_<label>.json` and run again. |
 | `ConnectionError` to `localhost:11434` | Ollama isn't running. Start it with `ollama serve`. |
 | `model not found` | Run `ollama pull gemma4:e4b`. |
-| Only 1 email per account | Raise `limit` in `run_triage()`. |
+| Fewer emails than expected | Raise `LIMIT` at the top of `triage.py`. |
 
 ## Privacy
 
 - Gmail access is read-only.
 - Classification runs entirely on your machine through Ollama.
-- `credentials.json`, `token*.json`, `results.json`, `digest.html` and logs are git-ignored. Never commit them.
+- `credentials.json` and everything in `data/` (tokens, results, digest) are git-ignored. Never commit them.
 
 ## Roadmap
 

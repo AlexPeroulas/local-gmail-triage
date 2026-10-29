@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
+DATA = BASE / "data"
 COLORS = {"high": "#e5484d", "medium": "#f5a524", "low": "#8b8d98"}
 
 
@@ -35,6 +36,7 @@ def write_html(results, done=True):
                 )
     parts.append("</body></html>")
 
-    out = BASE / "digest.html"
+    DATA.mkdir(exist_ok=True)
+    out = DATA / "digest.html"
     out.write_text("\n".join(parts), encoding="utf-8")
     return out

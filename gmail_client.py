@@ -9,10 +9,11 @@ import base64
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 BASE = Path(__file__).resolve().parent
+DATA = BASE / "data"
 
 
 def get_service(account):
-    token_path = BASE / f"token_{account}.json"
+    token_path = DATA / f"token_{account}.json"
     creds = None
 
     if(token_path.exists()):
@@ -26,6 +27,7 @@ def get_service(account):
             flow = InstalledAppFlow.from_client_secrets_file(str(BASE / "credentials.json"), SCOPES)
             creds = flow.run_local_server(port=0)
 
+        DATA.mkdir(exist_ok=True)
         token_path.write_text(creds.to_json())
 
     

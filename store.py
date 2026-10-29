@@ -3,7 +3,8 @@ import json
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
-RESULTS = BASE / "results.json"
+DATA = BASE / "data"
+RESULTS = DATA / "results.json"
 
 
 def load_results():
@@ -13,6 +14,7 @@ def load_results():
 
 
 def save_results(results):
+    DATA.mkdir(exist_ok=True)
     tmp = RESULTS.with_suffix(".tmp")
     tmp.write_text(json.dumps(results), encoding="utf-8")
     os.replace(tmp, RESULTS)
