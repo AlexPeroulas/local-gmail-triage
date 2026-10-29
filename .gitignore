@@ -9,3 +9,4 @@ __pycache__/
 *.pyc
 .claude/settings.local.json
 .taste-skill/
+.venv/
