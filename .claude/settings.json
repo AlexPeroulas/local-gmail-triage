@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./credentials.json)",
+      "Read(./token*.json)",
+      "Read(./results.json)",
+      "Read(./digest.html)",
+      "Read(./triage.log)",
+      "Read(./.env)"
+    ]
+  }
+}

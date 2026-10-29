@@ -1,0 +1,11 @@
+credentials.json
+token*.json
+results.json
+results.tmp
+digest.html
+triage.log
+.env
+__pycache__/
+*.pyc
+.claude/settings.local.json
+.taste-skill/
