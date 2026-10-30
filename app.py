@@ -2,6 +2,7 @@ import re
 import threading
 from datetime import datetime, timedelta, timezone
 from email.utils import parseaddr, parsedate_to_datetime
+from urllib.parse import quote
 from flask import Flask, abort, jsonify, render_template, request
 from gmail_client import login, get_address, is_signed_in, token_path, NotSignedIn
 from store import (load_results, load_actions, save_actions, action_key,
@@ -67,6 +68,13 @@ def day_and_clock(dt, now):
     return f"{dt:%b} {dt.day} {clock(dt)}"
 
 
+def gmail_link(address, message_id):
+    # plain link to the email in Gmail; authuser picks the right signed-in account
+    if not address:
+        return ""
+    return f"https://mail.google.com/mail/?authuser={quote(address)}#all/{quote(message_id)}"
+
+
 def email_time(date_header):
     try:
         return parsedate_to_datetime(date_header).astimezone()
@@ -85,6 +93,7 @@ def index():
     for r in results:
         r["new"] = bool(meta.get("run")) and r.get("run") == meta["run"]   # added by the latest finished run
         r["sender"] = sender_name(r["from"])
+        r["gmail_url"] = gmail_link(config["accounts"].get(r["account"]), r["id"])
         r["dt"] = email_time(r["date"])
         r["time"] = short_time(r["dt"], now)
     oldest = datetime.min.replace(tzinfo=timezone.utc)   # emails with no date go last

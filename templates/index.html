@@ -135,6 +135,9 @@
     .ghost { height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control);
              background: var(--surface); color: var(--text); white-space: nowrap; }
     .ghost:hover { background: var(--raised); }
+    a.ghost { display: inline-flex; align-items: center; text-decoration: none; }
+    .subject a { color: inherit; text-decoration: none; }
+    .subject a:hover { text-decoration: underline; }
     .ghost.icon { width: 30px; padding: 0; display: inline-grid; place-items: center; }
     .ghost.danger { color: var(--high); }
     .empty { color: var(--muted); padding: 32px 0; }
@@ -222,11 +225,12 @@
                     <span class="name" title="{{ r['from'] }}">{{ r.sender }}</span><span class="tag">{{ r.account }}</span>
                     {% if r.new %}<span class="tag new" title="Added by the latest run">New</span>{% endif %}
                   </div>
-                  <div class="subject">{{ r.subject or "(no subject)" }}</div>
+                  <div class="subject">{% if r.gmail_url %}<a href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer" title="Open in Gmail">{{ r.subject or "(no subject)" }}</a>{% else %}{{ r.subject or "(no subject)" }}{% endif %}</div>
                   <div class="reason">{{ r.reason }}</div>
                 </div>
                 <span class="time" title="{{ r.date }}">{{ r.time }}</span>
                 <div class="actions hover-actions">
+                  {% if r.gmail_url %}<a class="ghost" href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer">Open</a>{% endif %}
                   <button class="ghost" data-status="done">Done</button>
                   <button class="ghost icon" data-status="ignored" aria-label="Ignore" title="Ignore"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
                 </div>
@@ -249,7 +253,7 @@
                 <div class="who">
                   <span class="name" title="{{ r['from'] }}">{{ r.sender }}</span><span class="tag">{{ r.account }}</span>
                 </div>
-                <div class="subject">{{ r.subject or "(no subject)" }}</div>
+                <div class="subject">{% if r.gmail_url %}<a href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer" title="Open in Gmail">{{ r.subject or "(no subject)" }}</a>{% else %}{{ r.subject or "(no subject)" }}{% endif %}</div>
                 <div class="when">{{ title }} {{ r.when }}</div>
               </div>
               <span class="time" title="{{ r.date }}">{{ r.time }}</span>
