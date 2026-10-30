@@ -1,7 +1,8 @@
 import requests
 import json
 from gmail_client import get_service, get_recent_emails, NotSignedIn
-from store import load_results, save_results, load_config, save_meta
+from store import (load_results, save_results, load_config, save_meta,
+                   load_corrections, load_rules, sender_address)
 from datetime import datetime
 from render import write_html
 from login import sign_in
@@ -19,9 +20,30 @@ Reply with JSON only, in exactly this format:
 {"priority": "high|medium|low", "reason": "one short sentence"}"""
 
 
-def classify(email):
+def pick_examples(corrections, sender, n=8):
+    # your past corrections, most relevant first: same sender, then same domain, then newest
+    domain = sender.split("@")[-1]
+    def score(c):
+        return (2 if c["sender"] == sender else 1 if c["sender"].split("@")[-1] == domain else 0, c["at"])
+    return sorted(corrections.values(), key=score, reverse=True)[:n]
+
+
+def examples_text(examples):
+    if not examples:
+        return ""
+    lines = []
+    for c in examples:
+        line = f'- From: {c["from"]} | Subject: {c["subject"]} -> {c["new"]} (not {c["old"]})'
+        if c.get("note"):
+            line += f'. Why: {c["note"]}'
+        lines.append(line)
+    return ("\n\nThe user corrected these earlier ratings. Rate similar emails the same way:\n"
+            + "\n".join(lines))
+
+
+def classify(email, examples=()):
     email_text = f"From: {email['from']}\nSubject: {email['subject']}\nPreview: {email['snippet']}\nBody: {email['body']}"
-    prompt = prompt_instructions + "\nEmail: " + email_text
+    prompt = prompt_instructions + examples_text(examples) + "\nEmail: " + email_text
 
     payload = {
         "model": "gemma4:e4b",
@@ -79,6 +101,8 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
         webbrowser.open(out.as_uri())
 
     seen = {(r["account"], r["id"]) for r in results}
+    corrections = load_corrections()
+    rules = load_rules()["rules"]
     added = 0
     run_id = datetime.now().isoformat(timespec="seconds")   # tags every email added by this run
 
@@ -91,7 +115,11 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
         for i, e in enumerate(new, 1):
             progress(f"{account}: classifying {i} of {len(new)}"
                      + (f" ({skipped} already done)" if skipped else ""))
-            priority, reason = classify(e)
+            sender = sender_address(e["from"])
+            if sender in rules:   # your rule decides; no need to ask the model
+                priority, reason = rules[sender], f"Sender rule: always {rules[sender]}"
+            else:
+                priority, reason = classify(e, pick_examples(corrections, sender))
             results.append({
                 "id": e["id"], "account": account, "from": e["from"],
                 "subject": e["subject"], "date": e["date"],

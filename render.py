@@ -1,7 +1,7 @@
 import html
 from datetime import datetime
 from pathlib import Path
-from store import load_actions, action_key
+from store import load_actions, action_key, load_corrections, load_rules, effective_priority
 
 BASE = Path(__file__).resolve().parent
 DATA = BASE / "data"
@@ -11,6 +11,8 @@ COLORS = {"high": "#e5484d", "medium": "#f5a524", "low": "#8b8d98"}
 def render_html(results, done=True):
     actions = load_actions()   # hide emails marked done / ignored in the UI
     results = [r for r in results if action_key(r) not in actions]
+    corrections, rules = load_corrections(), load_rules()   # your fixes and sender rules win
+    results = [{**r, "priority": effective_priority(r, corrections, rules)[0]} for r in results]
     refresh = "" if done else "<meta http-equiv='refresh' content='3'>"
     status = "" if done else f"<p>Still running... {len(results)} emails so far</p>"
     parts = [

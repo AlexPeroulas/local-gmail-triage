@@ -1,5 +1,6 @@
 import os
 import json
+from email.utils import parseaddr
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
@@ -7,6 +8,8 @@ DATA = BASE / "data"
 RESULTS = DATA / "results.json"
 ACTIONS = DATA / "actions.json"   # done / ignored, written only by the UI
 META = DATA / "meta.json"         # last run time and count
+CORRECTIONS = DATA / "corrections.json"   # your priority fixes, written only by the UI
+RULES = DATA / "rules.json"               # sender -> priority, written only by the UI
 CONFIG = BASE / "config.json"
 DEFAULT_CONFIG = {"accounts": {}, "query": "in:inbox newer_than:1d", "limit": 20}
 
@@ -44,6 +47,40 @@ def load_actions():
 
 def save_actions(actions):
     write_json(ACTIONS, actions)
+
+
+def sender_address(from_header):
+    # "Jane Doe <Jane@X.com>" -> "jane@x.com"
+    return parseaddr(from_header)[1].lower()
+
+
+def load_corrections():
+    # {"<account>:<id>": {"from", "sender", "subject", "old", "new", "note", "at"}}
+    return read_json(CORRECTIONS, {})
+
+
+def save_corrections(corrections):
+    write_json(CORRECTIONS, corrections)
+
+
+def load_rules():
+    # {"rules": {"<sender address>": "high" | "medium" | "low"}, "declined": [<addresses not to suggest again>]}
+    return read_json(RULES, {"rules": {}, "declined": []})
+
+
+def save_rules(rules):
+    write_json(RULES, rules, indent=2)
+
+
+def effective_priority(r, corrections, rules):
+    # your correction beats a sender rule, which beats the model; returns (priority, source)
+    correction = corrections.get(action_key(r))
+    if correction:
+        return correction["new"], "corrected"
+    rule = rules["rules"].get(sender_address(r["from"]))
+    if rule:
+        return rule, "rule"
+    return r["priority"], "model"
 
 
 def load_meta():

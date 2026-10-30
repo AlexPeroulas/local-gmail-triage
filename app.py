@@ -6,7 +6,8 @@ from urllib.parse import quote
 from flask import Flask, abort, jsonify, render_template, request
 from gmail_client import login, get_address, is_signed_in, token_path, NotSignedIn
 from store import (load_results, load_actions, save_actions, action_key,
-                   load_meta, load_config, save_config)
+                   load_meta, load_config, save_config, sender_address,
+                   load_corrections, save_corrections, load_rules, save_rules, effective_priority)
 from triage import run_triage
 
 app = Flask(__name__)
@@ -20,6 +21,8 @@ run_state = {"running": False, "message": "", "error": None}
 run_lock = threading.Lock()
 actions_lock = threading.Lock()   # one /action write at a time
 config_lock = threading.Lock()    # one config.json write at a time
+learn_lock = threading.Lock()     # one corrections.json / rules.json write at a time
+SUGGEST_AFTER = 2                 # corrections for one sender before offering a rule
 logins = {}                       # label -> {"state": "waiting" | "ok" | "error", "message": ...}
 
 
@@ -90,7 +93,11 @@ def index():
     config = load_config(required=False)
 
     meta = load_meta()
+    corrections = load_corrections()
+    rules = load_rules()
     for r in results:
+        r["model_priority"] = r["priority"]
+        r["priority"], r["source"] = effective_priority(r, corrections, rules)
         r["new"] = bool(meta.get("run")) and r.get("run") == meta["run"]   # added by the latest finished run
         r["sender"] = sender_name(r["from"])
         r["gmail_url"] = gmail_link(config["accounts"].get(r["account"]), r["id"])
@@ -126,9 +133,13 @@ def index():
     # filter shows configured accounts, plus any removed ones that still have results
     filter_accounts = list(config["accounts"]) + sorted({r["account"] for r in results} - set(config["accounts"]))
 
+    recent_corrections = sorted(({"key": k, **c} for k, c in corrections.items()),
+                                key=lambda c: c["at"], reverse=True)[:20]
+
     return render_template("index.html", groups=groups, handled=handled, state=run_state,
                            last_checked=last_checked, config=config, accounts=accounts,
-                           filter_accounts=filter_accounts)
+                           filter_accounts=filter_accounts, rules=rules["rules"],
+                           corrections=recent_corrections, correction_count=len(corrections))
 
 
 def run_in_background():
@@ -168,6 +179,74 @@ def set_action():
         else:
             actions[key] = {"status": status, "at": datetime.now().isoformat(timespec="seconds")}
         save_actions(actions)
+    return jsonify(ok=True)
+
+
+# ---- Learning from your corrections ----
+
+@app.post("/correct")
+def correct():
+    # body: {"account", "id", "priority": "high" | "medium" | "low", "note": "optional why"}
+    data = request.get_json(silent=True) or {}
+    priority = data.get("priority")
+    note = str(data.get("note") or "").strip()[:200]
+    if priority not in LEVELS or not data.get("account") or not data.get("id"):
+        abort(400)
+    key = action_key(data)
+    r = next((r for r in load_results() if action_key(r) == key), None)
+    if r is None:
+        abort(404)
+    sender = sender_address(r["from"])
+
+    with learn_lock:
+        corrections = load_corrections()
+        if priority == r["priority"]:   # back to what the model said: forget the correction
+            corrections.pop(key, None)
+        else:
+            corrections[key] = {"from": r["from"], "sender": sender, "subject": r["subject"],
+                                "old": r["priority"], "new": priority, "note": note,
+                                "at": datetime.now().isoformat(timespec="seconds")}
+        save_corrections(corrections)
+
+        # offer a sender rule once the same fix has been made SUGGEST_AFTER times
+        rules = load_rules()
+        same = sum(1 for c in corrections.values() if c["sender"] == sender and c["new"] == priority)
+        suggest = None
+        if sender and same >= SUGGEST_AFTER and sender not in rules["rules"] and sender not in rules["declined"]:
+            suggest = {"sender": sender, "priority": priority, "count": same}
+    return jsonify(ok=True, suggest=suggest)
+
+
+@app.post("/corrections/remove")
+def remove_correction():
+    key = (request.get_json(silent=True) or {}).get("key")
+    with learn_lock:
+        corrections = load_corrections()
+        if corrections.pop(key, None) is None:
+            abort(404)
+        save_corrections(corrections)
+    return jsonify(ok=True)
+
+
+@app.post("/rules")
+def set_rule():
+    # body: {"sender": "x@y.com", "priority": "low"} to set, {"priority": null} to remove,
+    #       {"decline": true} to stop suggesting a rule for this sender
+    data = request.get_json(silent=True) or {}
+    sender = str(data.get("sender", "")).strip().lower()
+    priority = data.get("priority")
+    if not EMAIL_RE.fullmatch(sender) or priority not in (*LEVELS, None):
+        abort(400)
+    with learn_lock:
+        rules = load_rules()
+        if data.get("decline"):
+            if sender not in rules["declined"]:
+                rules["declined"].append(sender)
+        elif priority is None:
+            rules["rules"].pop(sender, None)
+        else:
+            rules["rules"][sender] = priority
+        save_rules(rules)
     return jsonify(ok=True)
 
 

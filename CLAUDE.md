@@ -13,6 +13,9 @@ Local email priority tool. Reads Gmail (read-only), classifies each email with a
 - templates/index.html: the UI page (Jinja autoescapes email text)
 - data/actions.json: done / ignored per "<account>:<id>", written only by app.py
 - data/meta.json: last run time and number of new emails (written by run_triage)
+- data/corrections.json: your priority fixes per "<account>:<id>"; up to 8 shown to the model as examples (triage.pick_examples). Written only by app.py
+- data/rules.json: sender address -> priority; skips the model. Written only by app.py
+- store.effective_priority: correction beats rule beats model (used by app.py and render.py)
 
 ## Privacy rules (important)
 - Never read, print, open, or copy: credentials.json, anything in data/ (token*.json, results.json, digest.html), triage.log, .env

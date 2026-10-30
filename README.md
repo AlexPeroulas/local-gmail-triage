@@ -1,6 +1,6 @@
 # Inbox Triage
 
-Local-first Gmail triage. Reads your inbox (read-only), ranks each email **high / medium / low** with a local Gemma model via [Ollama](https://ollama.com), and writes a simple HTML digest.
+Local-first Gmail triage across several accounts. Reads your inboxes (read-only), ranks each email **high / medium / low** with a local Gemma model via [Ollama](https://ollama.com), and shows the result in a small web app that runs on your own computer. It learns from your corrections.
 
 Email content never leaves your machine: the only network calls are the Gmail API and `localhost:11434`.
 
@@ -10,10 +10,15 @@ Juggling several inboxes (work, personal, school) makes it easy to miss the few 
 
 ## How it works
 
-1. `gmail_client.py` fetches recent inbox emails for each account (`gmail.readonly` scope).
-2. `triage.py` sends each email to the local model and gets back a priority and a one-line reason.
-3. `store.py` saves results to `data/results.json` so emails aren't classified twice.
-4. `render.py` builds `data/digest.html`, grouped by priority and account.
+1. `gmail_client.py` signs in to each account (OAuth, `gmail.readonly` scope) and fetches recent emails.
+2. `triage.py` classifies each new email with the local model and gets back a priority and a one-line reason.
+   - Senders with a **rule** skip the model.
+   - Otherwise the prompt includes up to 8 of your past **corrections** as examples (same sender first, then same domain, then newest).
+3. `store.py` saves everything as JSON in `data/`, so emails are never classified twice.
+4. `app.py` is a Flask app on `127.0.0.1:5000` that shows the results (`templates/index.html`), runs triage in the background, and saves your actions.
+5. `render.py` also writes a static `data/digest.html` for scheduled runs.
+
+Priority shown = your correction, else a sender rule, else the model's answer.
 
 ## Setup
 
@@ -140,11 +145,14 @@ python app.py
 
 Open **http://127.0.0.1:5000**. The app only accepts connections from your own computer.
 
-- **Inbox:** emails grouped by priority, newest first, with the model's reason. Hover a row for **Done** or **Ignore** (with Undo).
+- **Inbox:** emails grouped by priority, newest first, with the model's reason. Emails from the latest run are tagged **New**.
+- **Row actions** (on hover): **Open in Gmail**, **Priority**, **Done**, **Ignore**. Done and Ignore can be undone.
 - **Completed / Ignored:** everything you've handled, with **Restore**.
-- **Account filter:** show one account at a time.
-- **Run now:** fetches and classifies new emails, with live progress. The top bar shows when it last checked.
+- **Accounts** (sidebar): show one account at a time.
+- **Run now:** fetches and classifies new emails, with live progress. The title row shows when it last checked.
+- **Dark mode:** the moon / sun button in the sidebar, or **Settings → Appearance** to follow your system.
 - **Settings:** add or remove accounts, sign in to each one, and change the Gmail search and limit. Saved to `config.json`.
+- **Priority:** wrong call? Hover a row, click the **Priority** button (⇅), pick the right level and optionally say why. Corrections are shown to the model as examples on the next run. Correct the same sender twice and you'll be offered a **sender rule** that skips the model for that sender. Manage both in Settings.
 
 New user? You can skip steps 5 and 6 above: start `app.py`, open **Settings**, add your accounts and click **Sign in** on each.
 
@@ -192,8 +200,10 @@ On macOS / Linux, use cron instead:
 
 - **Read-only access.** The only Gmail scope is `gmail.readonly`. The app can't send, delete, or change anything.
 - **Local classification.** Email bodies are sent only to Ollama on `localhost:11434`. No other servers are contacted besides the Gmail API.
-- **Minimal storage.** `data/results.json` keeps sender, subject, date, priority and the model's reason. Email bodies are not saved.
-- **Escaped output.** Email text is untrusted, so everything shown in the digest goes through `html.escape`.
+- **Minimal storage.** `data/results.json` keeps sender, subject, date, priority and the model's reason. Email bodies are not saved. Your actions, corrections and rules are separate files in `data/` (`actions.json`, `corrections.json`, `rules.json`).
+- **Escaped output.** Email text is untrusted. The web app escapes it through Jinja's autoescaping (and builds new rows with `textContent`), and the static digest uses `html.escape`.
+- **Local-only web app.** Flask binds to `127.0.0.1`, rejects requests for any other host name (blocks DNS rebinding), and rejects `POST`s from other websites (checks `Origin`).
+- **No outside resources.** The page loads no fonts, scripts or images from the internet. **Open in Gmail** is a plain link you click; the app itself makes no request.
 - **Nothing secret in git.** `credentials.json`, `config.json` and `data/` are git-ignored.
 
 **What you should know**
@@ -206,14 +216,16 @@ On macOS / Linux, use cron instead:
 
 ## Known issues
 
-- No error handling if Ollama isn't running or returns bad output. The run crashes.
-- An unexpected priority value from the model (anything other than high / medium / low) crashes `render.py`.
+- No retry if Ollama isn't running or returns bad output. The run stops; the web app shows the error next to **Run now**.
+- An unexpected priority value from the model (anything other than high / medium / low) is saved but not shown in any group.
+- **Open in Gmail** uses a link format Google doesn't officially document. It could stop working.
 - Tokens expire after 7 days while the OAuth app is in Testing mode, so you have to run `python login.py` about once a week.
 - Only plain-text email bodies are read. HTML-only emails are classified from the subject and preview. Bodies are cut off at 1,000 characters.
 - `results.json` and the digest grow forever. Old results are never removed.
 
 ## Roadmap
 
-- Flask UI (localhost only) with **Run now**, filters, and live progress
-- Mark as done / correct a priority
-- Error handling when Ollama is not running
+- Retention: drop old low / medium emails automatically; high stays until handled
+- Deadline detection, so emails stay until a few days after their deadline
+- Retry and clearer errors when Ollama is down or returns bad output
+- Keyboard shortcuts (`j` / `k`, `e` for Done)
