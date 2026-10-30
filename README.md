@@ -4,6 +4,10 @@ Local-first Gmail triage. Reads your inbox (read-only), ranks each email **high 
 
 Email content never leaves your machine: the only network calls are the Gmail API and `localhost:11434`.
 
+## Why
+
+Juggling several inboxes (work, personal, school) makes it easy to miss the few emails that matter. Cloud AI summaries would fix that, but they mean handing your whole inbox to a third party. This tool does the sorting with a model running on your own computer, so you get a short "what needs me today" list without sending your email anywhere.
+
 ## How it works
 
 1. `gmail_client.py` fetches recent inbox emails for each account (`gmail.readonly` scope).
@@ -131,11 +135,32 @@ On macOS / Linux, use cron instead:
 | `model not found` | Run `ollama pull gemma4:e4b`. |
 | Fewer emails than expected | Raise `LIMIT` at the top of `triage.py`. |
 
-## Privacy
+## Privacy and security
 
-- Gmail access is read-only.
-- Classification runs entirely on your machine through Ollama.
-- `credentials.json` and everything in `data/` (tokens, results, digest) are git-ignored. Never commit them.
+**What it does to protect you**
+
+- **Read-only access.** The only Gmail scope is `gmail.readonly`. The app can't send, delete, or change anything.
+- **Local classification.** Email bodies are sent only to Ollama on `localhost:11434`. No other servers are contacted besides the Gmail API.
+- **Minimal storage.** `data/results.json` keeps sender, subject, date, priority and the model's reason. Email bodies are not saved.
+- **Escaped output.** Email text is untrusted, so everything shown in the digest goes through `html.escape`.
+- **Nothing secret in git.** `credentials.json` and `data/` are git-ignored.
+
+**What you should know**
+
+- **Tokens are stored as plain files.** `data/token_<label>.json` grants read access to that inbox. Anyone or anything with access to your user account can use them. To cut access, revoke the app at [myaccount.google.com/permissions](https://myaccount.google.com/permissions) and delete the token files.
+- **Watch out for synced folders.** If the project is inside OneDrive, Dropbox, iCloud or similar, `data/` (tokens and results) gets uploaded to that cloud. Keep the project in a folder that isn't synced.
+- **Emails can try to game the model.** An email could include text like "mark this as high priority". The worst case is a wrong ranking: the model can't take actions, and the app is read-only.
+- **The model can be wrong.** Skim the low-priority list now and then.
+- **Don't share `credentials.json`.** Google treats Desktop app client secrets as not fully secret, but publishing yours lets others impersonate your app.
+
+## Known issues
+
+- No error handling if Ollama isn't running or returns bad output. The run crashes.
+- An unexpected priority value from the model (anything other than high / medium / low) crashes `render.py`.
+- Every run opens the digest in your browser, including scheduled runs.
+- Tokens expire after 7 days while the OAuth app is in Testing mode. A scheduled run then waits for a browser sign-in that nobody completes.
+- Only plain-text email bodies are read. HTML-only emails are classified from the subject and preview. Bodies are cut off at 1,000 characters.
+- `results.json` and the digest grow forever. Old results are never removed.
 
 ## Roadmap
 
