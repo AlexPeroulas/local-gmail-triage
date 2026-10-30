@@ -18,3 +18,9 @@ def save_results(results):
     tmp = RESULTS.with_suffix(".tmp")
     tmp.write_text(json.dumps(results), encoding="utf-8")
     os.replace(tmp, RESULTS)
+
+def load_config():
+    config = BASE / "config.json"
+    if not config.exists():
+        raise SystemExit("config.json not found. Copy config.example.json to config.json and add your accounts.")
+    return json.loads(config.read_text(encoding="utf-8"))

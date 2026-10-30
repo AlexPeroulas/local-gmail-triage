@@ -1,14 +1,11 @@
 import requests
 import json
-from gmail_client import get_service, get_recent_emails
-from store import load_results, save_results
+from gmail_client import get_service, get_recent_emails, NotSignedIn
+from store import load_results, save_results, load_config
 from render import write_html
+from login import sign_in
+import sys
 import webbrowser
-
-# Settings: one label per Gmail account (token saved as token_<label>.json)
-ACCOUNTS = ("work", "personal", "school")
-QUERY = "in:inbox newer_than:1d"   # any Gmail search query
-LIMIT = 20                        # max emails per account per run
 
 
 prompt_instructions = """Rate the priority of this email for a college CS student.
@@ -41,12 +38,37 @@ def classify(email):
     return answer["priority"], answer["reason"]
 
 
-def run_triage(accounts=ACCOUNTS, query=QUERY, limit=LIMIT):
-    results = load_results()
-    seen = {(r["account"], r["id"]) for r in results}
+def get_services(accounts, scheduled):
+    # sign in to every account first, before the slow classification
+    services, missing = {}, []
+    for account, address in accounts.items():
+        try:
+            services[account] = get_service(account)
+        except NotSignedIn:
+            if scheduled:   # nobody is around to finish a browser sign-in
+                missing.append(account)
+                continue
+            svc = sign_in(account, address)
+            if svc is None:
+                missing.append(account)
+            else:
+                services[account] = svc
+    if missing:
+        raise SystemExit(f"Not signed in: {', '.join(missing)}. Run: python login.py")
+    return services
 
-    # sign in to every account first, so logins don't wait on classification
-    services = {account: get_service(account) for account in accounts}
+
+def run_triage(scheduled=False):
+    config = load_config()
+    query, limit = config["query"], config["limit"]
+    services = get_services(config["accounts"], scheduled)
+
+    results = load_results()
+    if not scheduled:   # open the page once sign-ins are done
+        out = write_html(results, done=False)
+        webbrowser.open(out.as_uri())
+
+    seen = {(r["account"], r["id"]) for r in results}
 
     for account, svc in services.items():
         for e in get_recent_emails(svc, query, limit):
@@ -65,6 +87,5 @@ def run_triage(accounts=ACCOUNTS, query=QUERY, limit=LIMIT):
 
 
 if __name__ == "__main__":
-    out = write_html(load_results(), done=False)   # refresh the page first
-    webbrowser.open(out.as_uri())                  # open it right away
-    run_triage()
+    # --scheduled: for Task Scheduler / cron (no sign-in pages, no browser)
+    run_triage("--scheduled" in sys.argv)

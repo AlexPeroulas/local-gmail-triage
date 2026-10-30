@@ -1,4 +1,5 @@
 from pathlib import Path
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -12,27 +13,44 @@ BASE = Path(__file__).resolve().parent
 DATA = BASE / "data"
 
 
+class NotSignedIn(Exception):
+    pass
+
+
+def token_path(account):
+    return DATA / f"token_{account}.json"
+
+
 def get_service(account):
-    token_path = DATA / f"token_{account}.json"
-    creds = None
+    # uses the saved token only; never opens a browser (see login())
+    path = token_path(account)
+    if not path.exists():
+        raise NotSignedIn(account)
 
-    if(token_path.exists()):
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-
-    if(not creds or not creds.valid):
-        if (creds and creds.expired and creds.refresh_token):
+    creds = Credentials.from_authorized_user_file(str(path), SCOPES)
+    if not creds.valid:
+        if not (creds.expired and creds.refresh_token):
+            raise NotSignedIn(account)
+        try:
             creds.refresh(Request())
-
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(str(BASE / "credentials.json"), SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        DATA.mkdir(exist_ok=True)
-        token_path.write_text(creds.to_json())
-
-    
+        except RefreshError:   # expired or revoked
+            raise NotSignedIn(account)
+        path.write_text(creds.to_json())
 
     return build("gmail", "v1", credentials = creds)
+
+
+def login(account, email):
+    # opens the Google sign-in page with the account's address pre-filled
+    flow = InstalledAppFlow.from_client_secrets_file(str(BASE / "credentials.json"), SCOPES)
+    creds = flow.run_local_server(port=0, login_hint=email, prompt="select_account")
+    DATA.mkdir(exist_ok=True)
+    token_path(account).write_text(creds.to_json())
+    return build("gmail", "v1", credentials = creds)
+
+
+def get_address(svc):
+    return svc.users().getProfile(userId="me").execute()["emailAddress"]
 
 def get_body(payload):
     # Case 1: this piece is plain text, so decode and return it

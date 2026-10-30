@@ -1,0 +1,9 @@
+{
+  "accounts": {
+    "work": "you@company.com",
+    "personal": "you@gmail.com",
+    "school": "you@school.edu"
+  },
+  "query": "in:inbox newer_than:1d",
+  "limit": 20
+}

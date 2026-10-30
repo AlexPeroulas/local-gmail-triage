@@ -72,33 +72,63 @@ You need your own OAuth client. It's free and takes about 5 minutes.
 
 ### 5. Configure your accounts
 
-Edit the settings at the top of `triage.py`:
-
-```python
-ACCOUNTS = ("work", "personal", "school")
-QUERY = "in:inbox newer_than:1d"
-LIMIT = 20
-```
-
-- `ACCOUNTS`: one label per Gmail account. The labels are only names; use as many or as few as you like. For a single account, keep the trailing comma: `("personal",)`.
-- `QUERY`: any Gmail search query, e.g. `in:inbox newer_than:2d` or `is:unread`.
-- `LIMIT`: max emails fetched per account per run. Lower it while testing to save time.
-
-### 6. First run and sign-in
+Copy the example config and edit it:
 
 ```bash
-python triage.py
+cp config.example.json config.json      # Windows cmd: copy config.example.json config.json
 ```
 
-For each account label, a browser window opens to sign in:
+```json
+{
+  "accounts": {
+    "work": "you@company.com",
+    "personal": "you@gmail.com",
+    "school": "you@school.edu"
+  },
+  "query": "in:inbox newer_than:1d",
+  "limit": 20
+}
+```
 
-1. Sign in with the Gmail account that matches that label (all sign-ins happen up front, in the order listed, before any emails are classified).
+- `accounts`: a short label for each Gmail address. Use as many or as few as you like.
+- `query`: any Gmail search query, e.g. `in:inbox newer_than:2d` or `is:unread`.
+- `limit`: max emails fetched per account per run. Lower it while testing to save time.
+
+> `config.json` holds your email addresses, so it's git-ignored.
+
+### 6. Sign in
+
+```bash
+python login.py
+```
+
+This checks every account in `config.json` and prints its status:
+
+```
+work       you@company.com                  signed in
+personal   you@gmail.com                    opening browser...
+school     you@school.edu                   signed in
+```
+
+For each account that isn't signed in, a browser window opens with that address pre-filled:
+
+1. Pick the matching Google account.
 2. You'll see **"Google hasn't verified this app"**. This is expected for your own private app. Click **Continue**.
 3. Allow read-only Gmail access.
 
-A token is saved as `data/token_<label>.json`, so later runs don't ask again.
+If you sign in with a different address than the one in `config.json`, the token is thrown away and you're told to try again.
 
-> **Tokens expire after 7 days** while the app is in **Testing** mode. If you get an auth error, delete `data/token_<label>.json` and sign in again.
+To redo one account (or switch which Google account it uses):
+
+```bash
+python login.py school
+```
+
+Tokens are saved as `data/token_<label>.json`.
+
+You can also skip this step: `python triage.py` signs in any missing accounts the same way before it starts. `login.py` is handy for checking which accounts are signed in, or redoing one.
+
+> **Tokens expire after 7 days** while the app is in **Testing** mode. When that happens, run `python login.py` (or just `python triage.py`) again.
 
 ## Usage
 
@@ -106,7 +136,7 @@ A token is saved as `data/token_<label>.json`, so later runs don't ask again.
 python triage.py
 ```
 
-This opens `data/digest.html` in your browser, classifies new emails (already classified ones are skipped), and refreshes the page as results come in.
+This signs in any accounts that need it, opens `data/digest.html` in your browser, classifies new emails (already classified ones are skipped), and refreshes the page as results come in.
 
 ### Run it automatically (Windows Task Scheduler)
 
@@ -114,14 +144,16 @@ This opens `data/digest.html` in your browser, classifies new emails (already cl
 2. Trigger: **Daily**, then add a second trigger in the task's properties for twice a day.
 3. Action: **Start a program**
    - Program: full path to `python.exe` (e.g. `C:\path\to\project\.venv\Scripts\python.exe`)
-   - Arguments: `triage.py`
+   - Arguments: `triage.py --scheduled`
    - Start in: full path to the project folder
 4. Make sure Ollama is set to start on login.
+
+`--scheduled` skips sign-in pages and doesn't open the browser. If a token has expired, the run stops with `Not signed in`; run `python login.py` by hand.
 
 On macOS / Linux, use cron instead:
 
 ```bash
-0 8,18 * * * cd /path/to/project && .venv/bin/python triage.py
+0 8,18 * * * cd /path/to/project && .venv/bin/python triage.py --scheduled
 ```
 
 ## Troubleshooting
@@ -130,7 +162,8 @@ On macOS / Linux, use cron instead:
 | --- | --- |
 | `FileNotFoundError: credentials.json` | Download the OAuth client JSON (step 4) and put it in the project folder. |
 | `access_denied` or "app not available" on sign-in | Add that Gmail address under **Audience → Test users**. |
-| `invalid_grant` / token errors | Delete `data/token_<label>.json` and run again. |
+| `Not signed in: ...` | Run `python login.py` (or `python login.py <label>` for one account). |
+| `config.json not found` | Copy `config.example.json` to `config.json` and fill in your accounts (step 5). |
 | `ConnectionError` to `localhost:11434` | Ollama isn't running. Start it with `ollama serve`. |
 | `model not found` | Run `ollama pull gemma4:e4b`. |
 | Fewer emails than expected | Raise `LIMIT` at the top of `triage.py`. |
@@ -143,7 +176,7 @@ On macOS / Linux, use cron instead:
 - **Local classification.** Email bodies are sent only to Ollama on `localhost:11434`. No other servers are contacted besides the Gmail API.
 - **Minimal storage.** `data/results.json` keeps sender, subject, date, priority and the model's reason. Email bodies are not saved.
 - **Escaped output.** Email text is untrusted, so everything shown in the digest goes through `html.escape`.
-- **Nothing secret in git.** `credentials.json` and `data/` are git-ignored.
+- **Nothing secret in git.** `credentials.json`, `config.json` and `data/` are git-ignored.
 
 **What you should know**
 
@@ -157,8 +190,7 @@ On macOS / Linux, use cron instead:
 
 - No error handling if Ollama isn't running or returns bad output. The run crashes.
 - An unexpected priority value from the model (anything other than high / medium / low) crashes `render.py`.
-- Every run opens the digest in your browser, including scheduled runs.
-- Tokens expire after 7 days while the OAuth app is in Testing mode. A scheduled run then waits for a browser sign-in that nobody completes.
+- Tokens expire after 7 days while the OAuth app is in Testing mode, so you have to run `python login.py` about once a week.
 - Only plain-text email bodies are read. HTML-only emails are classified from the subject and preview. Bodies are cut off at 1,000 characters.
 - `results.json` and the digest grow forever. Old results are never removed.
 

@@ -3,8 +3,10 @@
 Local email priority tool. Reads Gmail (read-only), classifies each email with a local Gemma model via Ollama, and shows results in an HTML page. Email data must never leave this machine.
 
 ## Files
-- gmail_client.py: Gmail login and fetching (get_service, get_recent_emails)
-- store.py: load_results / save_results for data/results.json
+- gmail_client.py: Gmail auth and fetching (get_service, login, get_address, get_recent_emails)
+- login.py: sign in / check accounts from config.json (python login.py [label])
+- config.json: accounts (label to address), query, limit; git-ignored, see config.example.json
+- store.py: load_results / save_results for data/results.json, load_config
 - render.py: write_html, builds data/digest.html (UI work happens here)
 - triage.py: classify (Ollama call) and run_triage
 - Planned: app.py (Flask UI with Run now, filters, live updates)
@@ -25,7 +27,7 @@ Local email priority tool. Reads Gmail (read-only), classifies each email with a
 
 ## Running
 - python triage.py (classify new emails, update data/digest.html)
-- python triage.py --open (also opens the page)
+- python triage.py --scheduled (no sign-in pages, no browser; used by Task Scheduler)
 - Scheduled twice a day with Windows Task Scheduler
 
 ## Working style
