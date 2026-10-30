@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inbox Triage</title>
+  <script>
+    // apply the theme before the page draws, so it never flashes light
+    function applyTheme() {
+      const choice = localStorage.getItem("theme") || "system";
+      const dark = choice === "dark" || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    }
+    applyTheme();
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+  </script>
+  <style>
+    /* Style: achromatic ledger. Ink on near-white; the only hue is on High. */
+    :root {
+      --ground: #f2f4f7;   /* blue-grey, one step off white */
+      --surface: #ffffff;
+      --raised: #eceef1;
+      --border: #e3e5e8;
+      --rule: #eff0f2;
+      --text: #0a0a0a;
+      --muted: #6b6b6b;
+      --accent: #141414;   /* the one primary action */
+      --on-accent: #ffffff;
+      --hover: #fafbfc;
+      --tag-ink: #3d3d3d;
+      --high: #c4242a;
+      --medium: #b7791f;
+      --low: #8b8d98;
+      --ok-bg: #dcfae5; --ok-ink: #04250e;
+      --new-bg: #e6eefb; --new-ink: #1d5fbf;
+      color-scheme: light;
+      --radius-card: 8px;
+      --radius-control: 6px;
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;   /* local fonts only, no CDN */
+    }
+    /* dark: same roles, lighter ink on a near-black ground; hues brightened to stay readable */
+    :root[data-theme="dark"] {
+      --ground: #0f1012;
+      --surface: #17181b;
+      --raised: #25262a;
+      --border: #2b2c31;
+      --rule: #222327;
+      --text: #ededed;
+      --muted: #9b9ca1;
+      --accent: #f2f2f2;
+      --on-accent: #0f1012;
+      --hover: #1c1d21;
+      --tag-ink: #c9c9cc;
+      --high: #ff6b6f;
+      --medium: #e3a63f;
+      --low: #8e9099;
+      --ok-bg: #133420; --ok-ink: #a8efbf;
+      --new-bg: #15284a; --new-ink: #8fb8f5;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--ground); color: var(--text); font: 14px/1.45 var(--font); }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    [hidden] { display: none !important; }
+
+    /* top bar: brand, tabs, status, Run now. One centred column shared with the content. */
+    .bar { position: sticky; top: 0; z-index: 1; background: var(--ground); }
+    .bar.scrolled { box-shadow: 0 1px 0 var(--border); }
+    .bar-inner, main { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+    .bar-inner { height: 52px; display: flex; align-items: center; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; margin: 0; }
+    .tabs { display: flex; gap: 20px; margin-right: auto; height: 100%; }
+    .tab { background: none; border: 0; padding: 0; height: 100%; color: var(--muted);
+           border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 6px; }
+    .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+    .tab .n { font-variant-numeric: tabular-nums; color: var(--muted); }
+    #status { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+    #status.error, .error { color: var(--high); }
+    .primary { height: 34px; padding: 0 14px; border: 0; border-radius: var(--radius-control);
+               background: var(--accent); color: var(--on-accent); font-weight: 500; }
+    .primary:disabled { background: var(--raised); color: var(--muted); cursor: default; }
+
+    /* title row, shared by every tab: title + summary on the left, account filter on the right */
+    .title { display: flex; align-items: flex-end; gap: 16px; margin: 28px 0 20px; }
+    .title > div:first-child { margin-right: auto; }
+    .title h2 { font-size: 24px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+    .title p { margin: 4px 0 0; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.45em; }
+    .filter { display: flex; background: var(--raised); border-radius: var(--radius-control); padding: 2px; }
+    .filter button { border: 0; background: none; height: 28px; padding: 0 10px; border-radius: 4px; color: var(--muted); }
+    .filter button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
+
+    /* priority groups */
+    .group { margin-bottom: 28px; }
+    .group-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+    .group-head .n { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+    .group-head::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot); }
+    .group.high { --dot: var(--high); }
+    .group.medium { --dot: var(--medium); }
+    .group.low { --dot: var(--low); }
+    details.group > summary { list-style: none; cursor: pointer; }
+    details.group > summary::-webkit-details-marker { display: none; }
+    details.group > summary .group-head::after { content: "Show"; margin-left: auto; color: var(--muted);
+                                                 font-size: 13px; font-weight: 400; }
+    details.group[open] > summary .group-head::after { content: "Hide"; }
+
+    /* list card and rows */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
+            list-style: none; margin: 0 0 28px; padding: 0; }
+    .row { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 12px 16px; }
+    .row + .row, .card > li + li { border-top: 1px solid var(--rule); }
+    .who { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+    .who .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .time { color: var(--muted); font-size: 13px; line-height: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .tag { flex: none; font-size: 12px; font-weight: 400; color: var(--tag-ink); background: var(--raised);
+           border-radius: 4px; padding: 1px 6px; }
+    .tag.ok { background: var(--ok-bg); color: var(--ok-ink); }
+    .tag.new { background: var(--new-bg); color: var(--new-ink); font-weight: 500; }
+    .theme-toggle { width: 34px; height: 34px; padding: 0; border: 0; border-radius: var(--radius-control);
+                    background: none; color: var(--muted); display: inline-grid; place-items: center; }
+    .theme-toggle:hover { background: var(--raised); color: var(--text); }
+    .theme-toggle .moon, [data-theme="dark"] .theme-toggle .sun { display: block; }
+    .theme-toggle .sun, [data-theme="dark"] .theme-toggle .moon { display: none; }
+    .subject { margin-top: 2px; }
+    .reason, .when, .hint { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .actions { display: flex; align-items: flex-start; gap: 6px; }
+    /* email rows: the time sits on the right; on hover / focus the buttons cover it (still keyboard reachable) */
+    .hover-actions { position: absolute; top: 9px; right: 12px; padding-left: 8px; background: var(--hover);   /* same as the hovered row */
+                     opacity: 0; transition: opacity .12s; }
+    .row:hover .hover-actions, .row:focus-within .hover-actions { opacity: 1; }
+    .row:hover, .row:focus-within { background: var(--hover); }
+    @media (hover: none) {   /* touch: no hover, so always show the buttons under the time */
+      .hover-actions { position: static; opacity: 1; grid-column: 1 / -1; padding: 0; margin-top: -8px; background: none; }
+    }
+    .ghost { height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control);
+             background: var(--surface); color: var(--text); white-space: nowrap; }
+    .ghost:hover { background: var(--raised); }
+    .ghost.icon { width: 30px; padding: 0; display: inline-grid; place-items: center; }
+    .ghost.danger { color: var(--high); }
+    .empty { color: var(--muted); padding: 32px 0; }
+
+    /* settings */
+    h3.section { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+    .form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 16px; }
+    .field + .form { border-top: 1px solid var(--rule); }
+    input[type=text], input[type=email], input[type=number] {
+      height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control);
+      background: var(--surface); min-width: 0; }
+    .field { display: grid; gap: 4px; padding: 12px 16px; }
+    .field + .field { border-top: 1px solid var(--rule); }
+    .field label { font-weight: 600; }
+    .field input { width: 100%; max-width: 420px; }
+    .field input[type=number] { max-width: 100px; }
+    .msg { font-size: 13px; }
+
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+             background: var(--accent); color: var(--on-accent); padding: 10px 12px 10px 16px; border-radius: var(--radius-card);
+             display: flex; gap: 16px; align-items: center; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+    #toast button { background: none; border: 0; color: inherit; font-weight: 600; text-decoration: underline; }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    @media (max-width: 640px) {
+      .bar-inner, main { padding: 0 16px; }
+      .bar-inner { height: auto; flex-wrap: wrap; gap: 8px 16px; padding-top: 10px; }
+      .tabs { order: 3; width: 100%; height: 40px; overflow-x: auto; }
+      .brand { margin-right: auto; }
+      #status { order: 4; width: 100%; padding-bottom: 6px; }
+      .title { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-inner">
+      <h1 class="brand">
+        <!-- mark: three bars, shortest last, like high / medium / low -->
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <rect x="1" y="2" width="16" height="3" rx="1.5" style="fill: var(--high)"/>
+          <rect x="1" y="7.5" width="11" height="3" rx="1.5" style="fill: var(--medium)"/>
+          <rect x="1" y="13" width="6" height="3" rx="1.5" style="fill: var(--low)"/>
+        </svg>
+        Inbox Triage
+      </h1>
+      <nav class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="inbox" data-title="Needs you">Inbox <span class="n"></span></button>
+        <button class="tab" role="tab" data-tab="done" data-title="Completed">Completed <span class="n"></span></button>
+        <button class="tab" role="tab" data-tab="ignored" data-title="Ignored">Ignored <span class="n"></span></button>
+        <button class="tab" role="tab" data-tab="settings" data-title="Settings">Settings</button>
+      </nav>
+      <span id="status" {% if state.error %}class="error"{% endif %}>{{ state.error or (state.message if state.running else last_checked) }}</span>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <svg class="moon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A6 6 0 0 1 6.4 2.5a6 6 0 1 0 7.1 7.1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <svg class="sun" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3 3l1 1M12 12l1 1M3 13l1-1M12 4l1-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <button id="run" class="primary" {% if state.running %}disabled{% endif %}>Run now</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="title">
+      <div>
+        <h2 id="panel-title">Needs you</h2>
+        <p id="summary"></p>
+      </div>
+      <div class="filter" id="filter" role="group" aria-label="Account" {% if filter_accounts|length < 2 %}hidden{% endif %}>
+        <button data-account="all">All</button>
+        {% for label in filter_accounts %}<button data-account="{{ label }}">{{ label }}</button>{% endfor %}
+      </div>
+    </div>
+
+    <!-- Inbox -->
+    <section class="panel" id="panel-inbox" role="tabpanel">
+      {% for level, emails in groups.items() %}
+        <details class="group {{ level }}" data-level="{{ level }}" {% if level != "low" %}open{% endif %}>
+          <summary><h3 class="group-head">{{ level|capitalize }} <span class="n"></span></h3></summary>
+          <ul class="card">
+            {% for r in emails %}
+              <li class="row email" data-account="{{ r.account }}" data-id="{{ r.id }}">
+                <div>
+                  <div class="who">
+                    <span class="name" title="{{ r['from'] }}">{{ r.sender }}</span><span class="tag">{{ r.account }}</span>
+                    {% if r.new %}<span class="tag new" title="Added by the latest run">New</span>{% endif %}
+                  </div>
+                  <div class="subject">{{ r.subject or "(no subject)" }}</div>
+                  <div class="reason">{{ r.reason }}</div>
+                </div>
+                <span class="time" title="{{ r.date }}">{{ r.time }}</span>
+                <div class="actions hover-actions">
+                  <button class="ghost" data-status="done">Done</button>
+                  <button class="ghost icon" data-status="ignored" aria-label="Ignore" title="Ignore"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endfor %}
+      <p class="empty" id="inbox-empty" hidden>Nothing needs you. Run now checks for new emails.</p>
+    </section>
+
+    <!-- Completed / Ignored -->
+    {% for status, title, empty in [("done", "Completed", "Emails you mark Done show up here."),
+                                     ("ignored", "Ignored", "Emails you ignore show up here.")] %}
+      <section class="panel" id="panel-{{ status }}" role="tabpanel" hidden>
+        <ul class="card" id="{{ status }}-list">
+          {% for r in handled[status] %}
+            <li class="row" data-account="{{ r.account }}" data-id="{{ r.id }}">
+              <div>
+                <div class="who">
+                  <span class="name" title="{{ r['from'] }}">{{ r.sender }}</span><span class="tag">{{ r.account }}</span>
+                </div>
+                <div class="subject">{{ r.subject or "(no subject)" }}</div>
+                <div class="when">{{ title }} {{ r.when }}</div>
+              </div>
+              <span class="time" title="{{ r.date }}">{{ r.time }}</span>
+              <div class="actions hover-actions"><button class="ghost restore">Restore</button></div>
+            </li>
+          {% endfor %}
+        </ul>
+        <p class="empty">{{ empty }}</p>
+      </section>
+    {% endfor %}
+
+    <!-- Settings: writes config.json -->
+    <section class="panel" id="panel-settings" role="tabpanel" hidden>
+      <h3 class="section">Accounts</h3>
+      <ul class="card" id="accounts">
+        {% for a in accounts %}
+          <li class="row" data-label="{{ a.label }}">
+            <div>
+              <div class="who">
+                <span class="name">{{ a.label }}</span>
+                {% if a.login and a.login.state == "waiting" %}<span class="tag">Waiting for Google...</span>
+                {% elif a.signed_in %}<span class="tag ok">Signed in</span>
+                {% else %}<span class="tag">Not signed in</span>{% endif %}
+              </div>
+              <div class="subject">{{ a.email }}</div>
+              {% if a.login and a.login.state == "error" %}<div class="reason error">{{ a.login.message }}</div>{% endif %}
+            </div>
+            <div class="actions always">
+              <button class="ghost" data-do="login" {% if a.login and a.login.state == "waiting" %}disabled{% endif %}>
+                {{ "Sign in again" if a.signed_in else "Sign in" }}</button>
+              <button class="ghost danger" data-do="remove">Remove</button>
+            </div>
+          </li>
+        {% endfor %}
+        <li>
+          <form class="form" id="add-account">
+            <input type="text" name="label" placeholder="Label, e.g. school" required pattern="[a-z0-9_\-]{1,20}"
+                   title="1-20 lowercase letters, numbers, - or _" style="width:160px">
+            <input type="email" name="email" placeholder="Gmail address" required style="flex:1;min-width:200px">
+            <button class="ghost">Add account</button>
+          </form>
+        </li>
+      </ul>
+      <p class="hint" style="margin:-20px 0 28px">Sign-in opens Google in a new tab. Use the address shown for that account.</p>
+
+      <h3 class="section">Appearance</h3>
+      <div class="card"><div class="form">
+        <div class="filter" id="theme" role="group" aria-label="Theme">
+          <button data-theme="system">System</button><button data-theme="light">Light</button><button data-theme="dark">Dark</button>
+        </div>
+        <span class="hint">Saved in this browser</span>
+      </div></div>
+
+      <h3 class="section">What to fetch</h3>
+      <form class="card" id="fetch-settings">
+        <div class="field">
+          <label for="query">Gmail search</label>
+          <input type="text" id="query" name="query" value="{{ config.query }}" required maxlength="200">
+          <span class="hint">Any Gmail search, e.g. <code>in:inbox newer_than:2d</code> or <code>is:unread</code></span>
+        </div>
+        <div class="field">
+          <label for="limit">Emails per account</label>
+          <input type="number" id="limit" name="limit" value="{{ config.limit }}" min="1" max="100" required>
+          <span class="hint">Max emails fetched from each account per run (1-100)</span>
+        </div>
+        <div class="form"><button class="ghost">Save</button><span class="msg" id="settings-msg"></span></div>
+      </form>
+    </section>
+  </main>
+
+  <div id="toast" hidden><span></span><button>Undo</button></div>
+
+  <script>
+    // small helper: POST JSON, return {ok, data}
+    async function post(url, body) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body ?? {}),
+      });
+      return {ok: res.ok, data: await res.json().catch(() => ({}))};
+    }
+
+    // ---- Tabs (remembered in the URL, e.g. #done) ----
+    const tabs = document.querySelectorAll(".tab");
+    let currentTab = "inbox";
+    function showTab(name) {
+      if (!document.getElementById(`panel-${name}`)) name = "inbox";
+      currentTab = name;
+      for (const tab of tabs) {
+        tab.setAttribute("aria-selected", tab.dataset.tab === name);
+        if (tab.dataset.tab === name) document.getElementById("panel-title").textContent = tab.dataset.title;
+      }
+      for (const panel of document.querySelectorAll(".panel")) panel.hidden = panel.id !== `panel-${name}`;
+      document.getElementById("filter").style.visibility = name === "settings" ? "hidden" : "";
+      history.replaceState(null, "", name === "inbox" ? location.pathname : `#${name}`);
+      updateCounts();
+    }
+    for (const tab of tabs) tab.addEventListener("click", () => showTab(tab.dataset.tab));
+
+    // thin line under the bar once content scrolls beneath it
+    const bar = document.querySelector(".bar");
+    addEventListener("scroll", () => bar.classList.toggle("scrolled", scrollY > 0));
+
+    // ---- Account filter (remembered in this browser) ----
+    const filterButtons = document.querySelectorAll("#filter button");
+    let account = localStorage.getItem("account") || "all";
+    if (![...filterButtons].some(b => b.dataset.account === account)) account = "all";
+
+    function applyFilter() {
+      for (const b of filterButtons) b.setAttribute("aria-pressed", b.dataset.account === account);
+      for (const row of document.querySelectorAll(".panel .row[data-account]")) {
+        row.hidden = account !== "all" && row.dataset.account !== account;
+      }
+      updateCounts();
+    }
+    for (const b of filterButtons) b.addEventListener("click", () => {
+      account = b.dataset.account;
+      localStorage.setItem("account", account);
+      applyFilter();
+    });
+
+    // recount tabs, groups and the summary line (visible rows only); hide groups that became empty
+    function updateCounts() {
+      const parts = [];
+      for (const group of document.querySelectorAll("#panel-inbox .group")) {
+        const n = group.querySelectorAll(".email:not([hidden])").length;
+        group.querySelector(".n").textContent = n;
+        group.hidden = n === 0;
+        if (n) parts.push(`${n} ${group.dataset.level}`);
+      }
+      const inbox = document.querySelectorAll("#panel-inbox .email:not([hidden])").length;
+      document.getElementById("inbox-empty").hidden = inbox > 0;
+
+      const counts = {inbox};
+      for (const status of ["done", "ignored"]) {
+        const ul = document.getElementById(`${status}-list`);
+        counts[status] = ul.querySelectorAll(".row:not([hidden])").length;
+        ul.hidden = counts[status] === 0;
+        ul.nextElementSibling.hidden = counts[status] > 0;
+      }
+      for (const tab of tabs) {
+        const n = tab.querySelector(".n");
+        if (n) n.textContent = counts[tab.dataset.tab];
+      }
+      document.getElementById("summary").textContent =
+        currentTab === "inbox" ? parts.join(" · ")
+        : currentTab === "settings" ? "Saved to config.json"
+        : `${counts[currentTab]} email${counts[currentTab] === 1 ? "" : "s"}`;
+    }
+
+    // ---- Run now ----
+    const button = document.getElementById("run");
+    const statusEl = document.getElementById("status");
+
+    function showError(text) {
+      statusEl.textContent = text;
+      statusEl.className = "error";
+    }
+
+    async function poll() {
+      const s = await (await fetch("/status")).json();
+      if (s.running) {
+        statusEl.textContent = s.message;
+        setTimeout(poll, 2000);
+      } else if (s.error) {
+        showError(s.error);
+        button.disabled = false;
+      } else {
+        location.reload();   // finished: show the new results
+      }
+    }
+
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      statusEl.className = "";
+      const {ok, data} = await post("/run");
+      if (!ok && data.error) {   // e.g. no accounts yet
+        showError(data.error);
+        button.disabled = false;
+        return;
+      }
+      poll();   // also covers 409: a run was already going
+    });
+
+    if (button.disabled) poll();   // a run was already going when the page loaded
+
+    // ---- Done / Ignore / Undo ----
+    const setStatus = async (account, id, status) => {
+      const {ok} = await post("/action", {account, id, status});
+      if (!ok) throw new Error("Could not save");
+    };
+
+    // Completed / Ignored entry built with textContent (never innerHTML: email text is untrusted)
+    function handledItem(row, label) {
+      const li = document.createElement("li");
+      li.className = "row";
+      li.dataset.account = row.dataset.account;
+      li.dataset.id = row.dataset.id;
+      const text = document.createElement("div");
+      text.append(row.querySelector(".who").cloneNode(true), row.querySelector(".subject").cloneNode(true));
+      const when = document.createElement("div");
+      when.className = "when";
+      when.textContent = `${label} just now`;
+      text.append(when);
+      const actions = document.createElement("div");
+      actions.className = "actions hover-actions";
+      const restore = document.createElement("button");
+      restore.className = "ghost restore";
+      restore.textContent = "Restore";
+      actions.append(restore);
+      li.append(text, row.querySelector(".time").cloneNode(true), actions);
+      return li;
+    }
+
+    const toast = document.getElementById("toast");
+    let toastTimer;
+    function showToast(text, onUndo) {
+      toast.querySelector("span").textContent = text;
+      toast.querySelector("button").onclick = () => { toast.hidden = true; onUndo(); };
+      toast.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.hidden = true, 6000);
+    }
+
+    document.getElementById("panel-inbox").addEventListener("click", async (event) => {
+      const btn = event.target.closest("button[data-status]");
+      if (!btn) return;
+      const row = btn.closest(".email");
+      const {account, id} = row.dataset;
+      const status = btn.dataset.status;
+
+      try { await setStatus(account, id, status); }
+      catch { return showError("Could not save. Is app.py running?"); }
+
+      // move the row to its tab, remembering where it was for Undo
+      const parent = row.parentNode, next = row.nextSibling;
+      row.remove();
+      const li = handledItem(row, status === "done" ? "Completed" : "Ignored");
+      document.getElementById(`${status}-list`).prepend(li);
+      applyFilter();
+
+      showToast(status === "done" ? "Marked done" : "Ignored", async () => {
+        try { await setStatus(account, id, null); }
+        catch { return showError("Could not undo. Is app.py running?"); }
+        li.remove();
+        parent.insertBefore(row, next);
+        applyFilter();
+      });
+    });
+
+    // Restore from Completed / Ignored: reload so the email lands back in its group
+    for (const status of ["done", "ignored"]) {
+      document.getElementById(`panel-${status}`).addEventListener("click", async (event) => {
+        const btn = event.target.closest("button.restore");
+        if (!btn) return;
+        const {account, id} = btn.closest(".row").dataset;
+        try { await setStatus(account, id, null); }
+        catch { return showError("Could not restore. Is app.py running?"); }
+        location.reload();
+      });
+    }
+
+    // ---- Settings ----
+    document.getElementById("add-account").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.target;
+      const {ok, data} = await post("/accounts", {label: form.label.value, email: form.email.value});
+      if (ok) location.reload();
+      else showError(data.error || "Could not add account.");
+    });
+
+    document.getElementById("fetch-settings").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.target;
+      const msg = document.getElementById("settings-msg");
+      const {ok, data} = await post("/settings", {query: form.query.value, limit: form.limit.value});
+      msg.className = ok ? "msg hint" : "msg error";
+      msg.textContent = ok ? "Saved. Used on the next run." : (data.error || "Could not save.");
+    });
+
+    // wait for a Google sign-in started from Settings, then reload to show the result
+    async function pollLogin(label) {
+      const s = await (await fetch("/status")).json();
+      if (s.logins[label]?.state === "waiting") setTimeout(() => pollLogin(label), 2000);
+      else location.reload();
+    }
+
+    document.getElementById("accounts").addEventListener("click", async (event) => {
+      const btn = event.target.closest("button[data-do]");
+      if (!btn) return;
+      const label = btn.closest(".row").dataset.label;
+
+      if (btn.dataset.do === "login") {
+        btn.disabled = true;
+        const {ok} = await post(`/accounts/${encodeURIComponent(label)}/login`);
+        if (!ok) return showError("Could not start sign-in.");
+        btn.closest(".row").querySelector(".tag").textContent = "Waiting for Google...";
+        pollLogin(label);
+      }
+
+      if (btn.dataset.do === "remove") {
+        // two clicks to remove: the first one arms the button for 4 seconds
+        if (!btn.dataset.armed) {
+          btn.dataset.armed = "1";
+          btn.textContent = "Click again to remove";
+          setTimeout(() => { delete btn.dataset.armed; btn.textContent = "Remove"; }, 4000);
+          return;
+        }
+        const {ok} = await post(`/accounts/${encodeURIComponent(label)}/remove`);
+        if (ok) location.reload();
+        else showError("Could not remove account.");
+      }
+    });
+
+    // a sign-in was already waiting when the page loaded
+    for (const row of document.querySelectorAll("#accounts .row")) {
+      if (row.querySelector("button[data-do=login]").disabled) pollLogin(row.dataset.label);
+    }
+
+    // ---- Appearance ----
+    const themeButtons = document.querySelectorAll("#theme button");
+    function markTheme() {
+      const choice = localStorage.getItem("theme") || "system";
+      for (const b of themeButtons) b.setAttribute("aria-pressed", b.dataset.theme === choice);
+    }
+    for (const b of themeButtons) b.addEventListener("click", () => {
+      localStorage.setItem("theme", b.dataset.theme);
+      applyTheme();
+      markTheme();
+    });
+    markTheme();
+
+    // top-bar toggle: flips to the opposite of what's showing (Settings can set it back to System)
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+      localStorage.setItem("theme", document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+      applyTheme();
+      markTheme();
+    });
+
+    showTab(location.hash.slice(1));
+    applyFilter();
+  </script>
+</body>
+</html>

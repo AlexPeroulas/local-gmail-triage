@@ -1,7 +1,8 @@
 import requests
 import json
 from gmail_client import get_service, get_recent_emails, NotSignedIn
-from store import load_results, save_results, load_config
+from store import load_results, save_results, load_config, save_meta
+from datetime import datetime
 from render import write_html
 from login import sign_in
 import sys
@@ -38,14 +39,18 @@ def classify(email):
     return answer["priority"], answer["reason"]
 
 
-def get_services(accounts, scheduled):
+class TriageError(Exception):
+    pass
+
+
+def get_services(accounts, allow_login):
     # sign in to every account first, before the slow classification
     services, missing = {}, []
     for account, address in accounts.items():
         try:
             services[account] = get_service(account)
         except NotSignedIn:
-            if scheduled:   # nobody is around to finish a browser sign-in
+            if not allow_login:   # nobody is around to finish a browser sign-in
                 missing.append(account)
                 continue
             svc = sign_in(account, address)
@@ -54,38 +59,55 @@ def get_services(accounts, scheduled):
             else:
                 services[account] = svc
     if missing:
-        raise SystemExit(f"Not signed in: {', '.join(missing)}. Run: python login.py")
+        raise TriageError(f"Not signed in: {', '.join(missing)}. Run: python login.py")
     return services
 
 
-def run_triage(scheduled=False):
+def run_triage(allow_login=True, open_page=True, on_progress=None):
+    def progress(message):
+        if on_progress:
+            on_progress(message)
+
     config = load_config()
     query, limit = config["query"], config["limit"]
-    services = get_services(config["accounts"], scheduled)
+    progress("Checking sign-ins...")
+    services = get_services(config["accounts"], allow_login)
 
     results = load_results()
-    if not scheduled:   # open the page once sign-ins are done
+    if open_page:   # open the page once sign-ins are done
         out = write_html(results, done=False)
         webbrowser.open(out.as_uri())
 
     seen = {(r["account"], r["id"]) for r in results}
+    added = 0
+    run_id = datetime.now().isoformat(timespec="seconds")   # tags every email added by this run
 
     for account, svc in services.items():
-        for e in get_recent_emails(svc, query, limit):
-            if (account, e["id"]) in seen:
-                continue
+        progress(f"Fetching up to {limit} emails from {account}...")
+        emails = get_recent_emails(svc, query, limit)
+        new = [e for e in emails if (account, e["id"]) not in seen]
+        skipped = len(emails) - len(new)
+
+        for i, e in enumerate(new, 1):
+            progress(f"{account}: classifying {i} of {len(new)}"
+                     + (f" ({skipped} already done)" if skipped else ""))
             priority, reason = classify(e)
             results.append({
                 "id": e["id"], "account": account, "from": e["from"],
                 "subject": e["subject"], "date": e["date"],
-                "priority": priority.lower(), "reason": reason,
+                "priority": priority.lower(), "reason": reason, "run": run_id,
             })
+            added += 1
             save_results(results)
             write_html(results, done=False)
 
     write_html(results, done=True)
-
+    save_meta({"last_run": datetime.now().isoformat(timespec="seconds"), "run": run_id, "added": added})
+    progress(f"Finished: {added} new emails")
 
 if __name__ == "__main__":
-    # --scheduled: for Task Scheduler / cron (no sign-in pages, no browser)
-    run_triage("--scheduled" in sys.argv)
+    scheduled = "--scheduled" in sys.argv
+    try:
+        run_triage(allow_login=not scheduled, open_page=not scheduled)
+    except TriageError as e:
+        sys.exit(str(e))

@@ -132,6 +132,24 @@ You can also skip this step: `python triage.py` signs in any missing accounts th
 
 ## Usage
 
+### The web app (recommended)
+
+```bash
+python app.py
+```
+
+Open **http://127.0.0.1:5000**. The app only accepts connections from your own computer.
+
+- **Inbox:** emails grouped by priority, newest first, with the model's reason. Hover a row for **Done** or **Ignore** (with Undo).
+- **Completed / Ignored:** everything you've handled, with **Restore**.
+- **Account filter:** show one account at a time.
+- **Run now:** fetches and classifies new emails, with live progress. The top bar shows when it last checked.
+- **Settings:** add or remove accounts, sign in to each one, and change the Gmail search and limit. Saved to `config.json`.
+
+New user? You can skip steps 5 and 6 above: start `app.py`, open **Settings**, add your accounts and click **Sign in** on each.
+
+### From the command line
+
 ```bash
 python triage.py
 ```

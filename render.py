@@ -1,13 +1,16 @@
 import html
 from datetime import datetime
 from pathlib import Path
+from store import load_actions, action_key
 
 BASE = Path(__file__).resolve().parent
 DATA = BASE / "data"
 COLORS = {"high": "#e5484d", "medium": "#f5a524", "low": "#8b8d98"}
 
 
-def write_html(results, done=True):
+def render_html(results, done=True):
+    actions = load_actions()   # hide emails marked done / ignored in the UI
+    results = [r for r in results if action_key(r) not in actions]
     refresh = "" if done else "<meta http-equiv='refresh' content='3'>"
     status = "" if done else f"<p>Still running... {len(results)} emails so far</p>"
     parts = [
@@ -35,8 +38,11 @@ def write_html(results, done=True):
                     f"<div>{html.escape(r['reason'])}</div></div>"
                 )
     parts.append("</body></html>")
+    return "\n".join(parts)
 
+
+def write_html(results, done=True):
     DATA.mkdir(exist_ok=True)
     out = DATA / "digest.html"
-    out.write_text("\n".join(parts), encoding="utf-8")
+    out.write_text(render_html(results, done), encoding="utf-8")
     return out

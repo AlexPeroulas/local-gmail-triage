@@ -6,10 +6,13 @@ Local email priority tool. Reads Gmail (read-only), classifies each email with a
 - gmail_client.py: Gmail auth and fetching (get_service, login, get_address, get_recent_emails)
 - login.py: sign in / check accounts from config.json (python login.py [label])
 - config.json: accounts (label to address), query, limit; git-ignored, see config.example.json
-- store.py: load_results / save_results for data/results.json, load_config
-- render.py: write_html, builds data/digest.html (UI work happens here)
+- store.py: load/save results and actions, load_config
+- render.py: write_html, builds the static data/digest.html (UI work now happens in templates/)
 - triage.py: classify (Ollama call) and run_triage
-- Planned: app.py (Flask UI with Run now, filters, live updates)
+- app.py: Flask UI on 127.0.0.1:5000 (Run now, Done / Ignore with Undo, tabs, account filter, Settings: accounts + sign-in, query, limit); Host + Origin checks on every request
+- templates/index.html: the UI page (Jinja autoescapes email text)
+- data/actions.json: done / ignored per "<account>:<id>", written only by app.py
+- data/meta.json: last run time and number of new emails (written by run_triage)
 
 ## Privacy rules (important)
 - Never read, print, open, or copy: credentials.json, anything in data/ (token*.json, results.json, digest.html), triage.log, .env

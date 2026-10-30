@@ -43,10 +43,23 @@ def get_service(account):
 def login(account, email):
     # opens the Google sign-in page with the account's address pre-filled
     flow = InstalledAppFlow.from_client_secrets_file(str(BASE / "credentials.json"), SCOPES)
-    creds = flow.run_local_server(port=0, login_hint=email, prompt="select_account")
+    try:
+        creds = flow.run_local_server(port=0, login_hint=email, prompt="select_account",
+                                      timeout_seconds=300)   # give up if the Google tab is closed
+    except AttributeError:   # the library's way of saying it timed out
+        raise NotSignedIn(account)
     DATA.mkdir(exist_ok=True)
     token_path(account).write_text(creds.to_json())
     return build("gmail", "v1", credentials = creds)
+
+
+def is_signed_in(account):
+    # quick offline check for the Settings page; a revoked token still shows up at run time
+    path = token_path(account)
+    if not path.exists():
+        return False
+    creds = Credentials.from_authorized_user_file(str(path), SCOPES)
+    return creds.valid or bool(creds.refresh_token)
 
 
 def get_address(svc):
