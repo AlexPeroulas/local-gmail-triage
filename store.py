@@ -11,7 +11,9 @@ META = DATA / "meta.json"         # last run time and count
 CORRECTIONS = DATA / "corrections.json"   # your priority fixes, written only by the UI
 RULES = DATA / "rules.json"               # sender -> priority, written only by the UI
 CONFIG = BASE / "config.json"
-DEFAULT_CONFIG = {"accounts": {}, "query": "in:inbox newer_than:1d", "limit": 20}
+# days after which an email leaves the Inbox (still kept in results.json); None = never
+DEFAULT_HIDE_AFTER = {"high": None, "medium": 10, "low": 2}
+DEFAULT_CONFIG = {"accounts": {}, "query": "in:inbox newer_than:1d", "limit": 20, "hide_after": DEFAULT_HIDE_AFTER}
 
 
 def read_json(path, default):

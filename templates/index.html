@@ -16,19 +16,21 @@
   </script>
   <style>
     /* Style: achromatic ledger in an open-plane shell (sidebar on the page ground, content beside it).
-       Ink on near-white; hue only on priority, New and status. */
+       Ink on near-white; hue only on priority, New and status.
+       Spacing on a 4px base. One left edge: the title, group heads and row text all start at the canvas edge;
+       row rules and hover fills bleed 12px past it. Type: 24 title, 14 body, 13 secondary, 12 tags. */
     :root {
-      --ground: #f2f4f7;   /* blue-grey, one step off white */
+      --ground: #fbfbfc;
       --surface: #ffffff;
-      --raised: #eceef1;
-      --active: #e3e6ea;   /* selected nav item */
-      --border: #e3e5e8;
-      --rule: #eff0f2;
+      --raised: #eff0f2;
+      --active: #ebecef;   /* selected nav item */
+      --border: #e2e3e7;
+      --rule: #ececef;
+      --hover: #f3f4f6;
       --text: #0a0a0a;
-      --muted: #6b6b6b;
+      --muted: #63656b;
       --accent: #141414;   /* the one primary action */
       --on-accent: #ffffff;
-      --hover: #fafbfc;
       --tag-ink: #3d3d3d;
       --high: #c4242a;
       --medium: #b7791f;
@@ -37,6 +39,7 @@
       --new-bg: #e6eefb; --new-ink: #1d5fbf;
       --radius-card: 8px;
       --radius-control: 6px;
+      --bleed: 12px;       /* rows and rules reach this far past the text edge */
       --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;   /* local fonts only, no CDN */
       color-scheme: light;
     }
@@ -44,15 +47,15 @@
     :root[data-theme="dark"] {
       --ground: #0f1012;
       --surface: #17181b;
-      --raised: #25262a;
+      --raised: #232428;
       --active: #222327;
       --border: #2b2c31;
-      --rule: #222327;
+      --rule: #1f2024;
+      --hover: #17181b;
       --text: #ededed;
       --muted: #9b9ca1;
       --accent: #f2f2f2;
       --on-accent: #0f1012;
-      --hover: #1c1d21;
       --tag-ink: #c9c9cc;
       --high: #ff6b6f;
       --medium: #e3a63f;
@@ -73,33 +76,33 @@
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
     /* ---- sidebar: brand, views, accounts, settings ---- */
-    .side { position: sticky; top: 0; height: 100vh; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; }
-    .brand { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; margin: 0; padding: 6px 10px 18px; }
-    .side h2 { font-size: 12px; font-weight: 500; color: var(--muted); margin: 20px 10px 6px; }
+    .side { position: sticky; top: 0; height: 100vh; padding: 20px 12px 16px; display: flex; flex-direction: column; gap: 2px;
+            border-right: 1px solid var(--rule); }
+    .brand { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; margin: 0; padding: 4px 10px 20px; }
+    .side h2 { font-size: 12px; font-weight: 500; color: var(--muted); margin: 24px 10px 4px; }
     .nav, .accounts { display: flex; flex-direction: column; gap: 2px; }
     .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; padding: 0 10px; border: 0;
-                border-radius: 8px; background: none; color: var(--text); text-align: left; white-space: nowrap; }
+                border-radius: var(--radius-control); background: none; color: var(--text); text-align: left; white-space: nowrap; }
     .nav-item svg { flex: none; color: var(--muted); }
-    .nav-item .n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+    .nav-item .n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
     .nav-item:hover { background: var(--raised); }
     .nav-item[aria-selected="true"], .nav-item[aria-pressed="true"] { background: var(--active); font-weight: 500; }
     .side .bottom { margin-top: auto; display: flex; align-items: center; gap: 4px; }
-    .theme-toggle { flex: none; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px;
+    .theme-toggle { flex: none; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-control);
                     background: none; color: var(--muted); display: inline-grid; place-items: center; }
     .theme-toggle:hover { background: var(--raised); color: var(--text); }
     .theme-toggle .moon, [data-theme="dark"] .theme-toggle .sun { display: block; }
     .theme-toggle .sun, [data-theme="dark"] .theme-toggle .moon { display: none; }
 
     /* ---- canvas ---- */
-    main { padding: 28px 40px 64px; max-width: 1160px; width: 100%; }
-    .title { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px 16px; margin: 4px 0 24px; }
-    .title > div:first-child { margin-right: auto; }
-    .title h1 { font-size: 24px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
-    .title p { margin: 4px 0 0; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.45em; }
-    .title .run { display: flex; align-items: center; gap: 12px; }
-    #status { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+    main { padding: 32px 40px 64px; width: 100%; }   /* fluid: the list uses the whole width */
+    .title { display: flex; align-items: center; gap: 16px; margin: 0 0 32px; }
+    .title > div:first-child { margin-right: auto; min-width: 0; }
+    .title h1 { font-size: 24px; font-weight: 600; margin: 0; letter-spacing: -0.01em; line-height: 1.25; }
+    .title p { margin: 4px 0 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; min-height: 1.45em; }
+    #summary:not(:empty) + #status:not(:empty)::before { content: " \00b7  "; color: var(--muted); }
     #status.error, .error { color: var(--high); }
-    .primary { height: 34px; padding: 0 14px; border: 0; border-radius: var(--radius-control);
+    .primary { flex: none; height: 34px; padding: 0 14px; border: 0; border-radius: var(--radius-control); white-space: nowrap;
                background: var(--accent); color: var(--on-accent); font-weight: 500; }
     .primary:disabled { background: var(--raised); color: var(--muted); cursor: default; }
 
@@ -109,8 +112,8 @@
     .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); }
 
     /* priority groups */
-    .group { margin-bottom: 28px; }
-    .group-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+    .group { margin-bottom: 32px; }
+    .group-head { display: flex; align-items: center; gap: 8px; height: 32px; margin: 0; font-size: 14px; font-weight: 600; }
     .group-head .n { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
     .group-head::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot); }
     .group.high { --dot: var(--high); }
@@ -121,69 +124,110 @@
     details.group > summary .group-head::after { content: "Show"; margin-left: auto; color: var(--muted);
                                                  font-size: 13px; font-weight: 400; }
     details.group[open] > summary .group-head::after { content: "Hide"; }
+    /* Older: past the cutoff in Settings; a hollow dot, since it mixes priorities */
+    .group.older .group-head::before { background: none; box-shadow: inset 0 0 0 1.5px var(--low); }
+    .group-note { margin: 0 0 8px; }
 
-    /* cards and rows */
+    /* email lists: rows on the page ground, split by rules that bleed past the text edge */
+    .list { list-style: none; margin: 0 calc(-1 * var(--bleed)); padding: 0; }
+    .list > li { border-top: 1px solid var(--rule); }
+    .list > li:last-child { border-bottom: 1px solid var(--rule); }
+    /* settings: grouped panels */
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
-            list-style: none; margin: 0 0 28px; padding: 0; overflow: hidden; }
+            list-style: none; margin: 0; padding: 0; overflow: hidden; }
     .card > li + li { border-top: 1px solid var(--rule); }
+
     .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 12px 16px; }
+    .row > div:first-child { min-width: 0; }
+    .list .row { padding: 12px var(--bleed); }
     .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tag { flex: none; font-size: 12px; font-weight: 400; color: var(--tag-ink); background: var(--raised);
-           border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+           border-radius: 4px; padding: 0 6px; line-height: 20px; white-space: nowrap; }
     .tag.ok { background: var(--ok-bg); color: var(--ok-ink); }
     .tag.new { background: var(--new-bg); color: var(--new-ink); font-weight: 500; }
     .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .subject { margin-top: 2px; }
+    .subject { margin-top: 2px; overflow-wrap: anywhere; }
     .reason, .when, .hint { color: var(--muted); font-size: 13px; margin-top: 2px; }
-    .actions { display: flex; align-items: flex-start; gap: 6px; }
-    .ghost { height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control);
+    .actions { display: flex; align-items: center; gap: 8px; }
+    .ghost { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-control);
              background: var(--surface); color: var(--text); white-space: nowrap; display: inline-flex;
              align-items: center; justify-content: center; text-decoration: none; }
     .ghost:hover { background: var(--raised); }
-    .ghost.icon { width: 30px; padding: 0; }
     .ghost.danger { color: var(--high); }
-    .empty { color: var(--muted); padding: 32px 0; }
+    /* icon actions on mail rows: no box, grey until hovered */
+    .icon-btn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-control); background: none;
+                color: var(--muted); display: inline-grid; place-items: center; }
+    .icon-btn:hover { background: var(--raised); color: var(--text); }
+    .empty { color: var(--muted); padding: 32px 0; margin: 0; }
 
-    /* mail rows: sender | subject + reason | a fixed end column for the time, or the actions on hover.
-       The end column is always 148px, so the actions never cover the text. */
-    .mail { grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) 148px; grid-template-areas: "who main end";
-            gap: 20px; align-items: start; }
+    /* mail rows: sender + tags | subject + reason | time over account (or the actions on hover).
+       The end column is a fixed 132px, so the four 30px actions never cover the text. */
+    .mail { grid-template-columns: 220px minmax(0, 1fr) 132px; grid-template-areas: "who main end";
+            gap: 24px; align-items: start; }
     .mail:hover, .mail:focus-within { background: var(--hover); }
-    .c-who { grid-area: who; min-width: 0; }
-    .c-who .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .c-who { grid-area: who; min-width: 0; display: flex; align-items: center; gap: 6px; }
+    .c-who .tags { display: flex; gap: 4px; flex: none; }
     .c-main { grid-area: main; min-width: 0; }
     .c-main .subject { margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .c-main .subject a { color: inherit; text-decoration: none; }
     .c-main .subject a:hover { text-decoration: underline; }
-    .c-end { grid-area: end; position: relative; min-height: 20px; text-align: right; }
-    .time { color: var(--muted); font-size: 13px; line-height: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .row-actions { position: absolute; top: -5px; right: 0; display: flex; gap: 4px; opacity: 0; transition: opacity .12s; }
+    .c-end { grid-area: end; position: relative; text-align: right; color: var(--muted); font-size: 13px;
+             font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .meta { display: flex; flex-direction: column; gap: 2px; line-height: 20px; }
+    .row-actions { position: absolute; top: -5px; right: 0; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
     .mail:hover .row-actions, .mail:focus-within .row-actions { opacity: 1; }
-    .mail:hover .c-end .time, .mail:focus-within .c-end .time { visibility: hidden; }
+    .mail:hover .meta, .mail:focus-within .meta { visibility: hidden; }
+    .cols { display: none; }
+
+    /* wide windows: one line per email, like a table.
+       184 sender | 1fr subject | 1fr why | 156 account + time (also fits the four 30px hover actions) */
+    @media (min-width: 1100px) {
+      .mail, .cols { grid-template-columns: 184px minmax(0, 1fr) minmax(0, 1fr) 156px; gap: 24px; }
+      .mail { grid-template-areas: "who subj why end"; align-items: center; }
+      .list .row.mail { padding-top: 9px; padding-bottom: 9px; }
+      .c-main { display: contents; }
+      .c-main > :first-child { grid-area: subj; }
+      .c-main > :last-child { grid-area: why; margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .meta { flex-direction: row; gap: 0; }
+      .meta .acct { order: -1; flex: 1; text-align: left; }
+      .cols { display: grid; color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+      .cols > :last-child { display: flex; justify-content: space-between; }
+    }
     @media (hover: none) {   /* touch: no hover, so the actions sit under the time, always visible */
-      .row-actions { position: static; opacity: 1; justify-content: flex-end; margin-top: 6px; }
+      .row-actions { position: static; opacity: 1; justify-content: flex-end; margin-top: 4px; }
     }
 
     /* "Wrong priority?" panel inside a row */
     .fix { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-           padding-top: 10px; border-top: 1px solid var(--rule); }
+           padding-top: 12px; border-top: 1px solid var(--rule); }
     .fix input { flex: 1; min-width: 180px; }
     /* rule suggestion, shown above the list */
-    .banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; margin: 0 0 24px;
+    .banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; margin: 0 0 32px;
               background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); }
     .banner span { margin-right: auto; }
 
-    /* settings */
-    #panel-settings { max-width: 760px; }
-    h3.section { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+    /* settings: each section is a row, title and description on the left, its panel on the right,
+       split by full-width rules (240 + 32 + 1fr fills the canvas) */
+    .setting { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 32px; padding: 32px 0; border-top: 1px solid var(--rule);
+               max-width: 1080px; }
+    .setting:first-child { padding-top: 0; border-top: 0; }
+    .setting-label .hint { margin-top: 4px; }
+    h3.section { font-size: 14px; font-weight: 600; margin: 8px 0 0; }   /* 8px: level with the panel's first line */
+    h3.section .hint { font-weight: 400; margin-left: 4px; }
     .form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 16px; }
-    .field + .form { border-top: 1px solid var(--rule); }
     input[type=text], input[type=email], input[type=number] {
-      height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control);
+      height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control);
       background: var(--surface); min-width: 0; }
     .field { display: grid; gap: 4px; padding: 12px 16px; }
-    .field + .field { border-top: 1px solid var(--rule); }
-    .field label { font-weight: 600; }
+    .field + .field, .field + .form { border-top: 1px solid var(--rule); }
+    .field label, .field .label { font-weight: 600; }
+    .field .segmented { justify-self: start; }
+    .field.inline { grid-template-columns: 96px auto; justify-content: start; align-items: center; gap: 12px; }
+    .field.inline input { width: 88px; margin-right: 6px; }
+    .examples { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+    .examples button { border: 0; border-radius: 4px; background: var(--raised); color: var(--text); padding: 1px 6px; margin-right: 8px;
+                       font: 12px/18px ui-monospace, Consolas, monospace; }   /* Gmail search syntax is code */
+    .examples button:hover { background: var(--active); }
     .field input { width: 100%; max-width: 420px; }
     .field input[type=number] { max-width: 100px; }
     .msg { font-size: 13px; }
@@ -195,27 +239,34 @@
 
     /* ---- phone and narrow windows: the sidebar folds into a top bar ---- */
     @media (max-width: 860px) {
+      :root { --bleed: 16px; }
       .app { display: block; }
-      .side { position: sticky; z-index: 2; height: auto; background: var(--ground); padding: 10px 16px 8px;
-              flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; box-shadow: 0 1px 0 var(--border); }
+      .side { position: sticky; z-index: 2; height: auto; background: var(--ground); padding: 10px 16px 8px; border-right: 0;
+              flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; border-bottom: 1px solid var(--rule); }
       .brand { padding: 4px 0; margin-right: auto; }
       .side .bottom { order: 1; margin: 0; }
       .side h2 { display: none; }
       .nav, .accounts { order: 2; width: 100%; flex-direction: row; overflow-x: auto; }
       .nav-item { width: auto; flex: none; }
       .accounts .nav-item { height: 28px; font-size: 13px; }
-      main { padding: 20px 16px 48px; }
-      .mail { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who end" "main main" "act act"; gap: 4px 12px; }
-      .c-end { min-width: 132px; }   /* room for the four hover buttons, so they never cover the name */
-      .c-who .tags { display: inline-flex; margin: 0 0 0 6px; vertical-align: 1px; }
-      .c-who { display: flex; align-items: center; }
+      main { padding: 24px 16px 48px; }
+      .title { margin-bottom: 24px; }
+      #status { display: block; }   /* its own line, so "11:08 PM" never splits */
+      #summary:not(:empty) + #status:not(:empty)::before { content: none; }
+      .setting { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 24px 0; }
+      h3.section { margin-top: 0; }
+      .mail { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who end" "main main" "act act"; gap: 2px 12px; }
+      .c-end { min-width: 128px; }   /* room for the hover actions, so they never cover the name */
+      .meta { flex-direction: row; justify-content: flex-end; gap: 8px; }
+      .meta .acct { order: -1; }
       .c-main .subject { white-space: normal; }
     }
-    /* touch screens in the narrow layout: buttons get their own line at the bottom of the row */
+    /* touch screens in the narrow layout: actions get their own line at the bottom of the row */
     @media (max-width: 860px) and (hover: none) {
       .c-end { display: contents; }
-      .c-end .time { grid-area: end; text-align: right; }
-      .row-actions { grid-area: act; justify-content: flex-start; margin-top: 6px; }
+      .meta { grid-area: end; }
+      .row-actions { grid-area: act; justify-content: flex-start; margin: 4px 0 -4px -8px; gap: 4px; }
+      .icon-btn { width: 36px; height: 36px; }
     }
   </style>
 </head>
@@ -267,12 +318,9 @@
     <div class="title">
       <div>
         <h1 id="panel-title">Needs you</h1>
-        <p id="summary"></p>
+        <p><span id="summary"></span><span id="status" {% if state.error %}class="error"{% endif %}>{{ state.error or (state.message if state.running else last_checked) }}</span></p>
       </div>
-      <div class="run">
-        <span id="status" {% if state.error %}class="error"{% endif %}>{{ state.error or (state.message if state.running else last_checked) }}</span>
-        <button id="run" class="primary" {% if state.running %}disabled{% endif %}>Run now</button>
-      </div>
+      <button id="run" class="primary" {% if state.running %}disabled{% endif %}>Run now</button>
     </div>
 
     <div class="banner" id="suggest" hidden>
@@ -283,39 +331,47 @@
 
     <!-- Inbox -->
     <section class="panel" id="panel-inbox" role="tabpanel">
+      <div class="cols" aria-hidden="true"><span>From</span><span>Subject</span><span>Why this priority</span><span><span>Account</span><span>Received</span></span></div>
+      {% macro mail_row(r, older=False) %}
+      <li class="row mail email" data-account="{{ r.account }}" data-id="{{ r.id }}" data-model="{{ r.model_priority }}" data-priority="{{ r.priority }}">
+        <div class="c-who">
+          <div class="name" title="{{ r['from'] }}">{{ r.sender }}</div>
+          <div class="tags">
+            {% if older %}<span class="tag">{{ r.priority|capitalize }}</span>{% endif %}
+            {% if r.new %}<span class="tag new" title="Added by the latest run">New</span>{% endif %}
+            {% if r.source == "corrected" %}<span class="tag" title="You changed this from {{ r.model_priority }}">Corrected</span>
+            {% elif r.source == "rule" %}<span class="tag" title="Set by a sender rule in Settings">Rule</span>{% endif %}
+          </div>
+        </div>
+        <div class="c-main">
+          <div class="subject" title="{{ r.subject }}">{% if r.gmail_url %}<a href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer" title="Open in Gmail">{{ r.subject or "(no subject)" }}</a>{% else %}{{ r.subject or "(no subject)" }}{% endif %}</div>
+          <div class="reason" title="{{ r.reason }}">{{ r.reason }}</div>
+        </div>
+        <div class="c-end">
+          <span class="meta"><span class="time" title="{{ r.date }}">{{ r.time }}</span><span class="acct">{{ r.account }}</span></span>
+          <div class="row-actions">
+            {% if r.gmail_url %}<a class="icon-btn" href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer" aria-label="Open in Gmail" title="Open in Gmail"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M8 2h4v4M12 2L6.5 7.5M10.5 8.5V12H2V3.5h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>{% endif %}
+            <button class="icon-btn" data-do="fix" aria-label="Change priority" title="Wrong priority?"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 11.5V2.5M1.8 4.7L4 2.5l2.2 2.2M10 2.5v9M7.8 9.3l2.2 2.2 2.2-2.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="icon-btn" data-status="done" aria-label="Done" title="Done"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="icon-btn" data-status="ignored" aria-label="Ignore" title="Ignore"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+      </li>
+      {% endmacro %}
       {% for level, emails in groups.items() %}
         <details class="group {{ level }}" data-level="{{ level }}" {% if level != "low" %}open{% endif %}>
           <summary><h2 class="group-head">{{ level|capitalize }} <span class="n"></span></h2></summary>
-          <ul class="card">
-            {% for r in emails %}
-              <li class="row mail email" data-account="{{ r.account }}" data-id="{{ r.id }}" data-model="{{ r.model_priority }}">
-                <div class="c-who">
-                  <div class="name" title="{{ r['from'] }}">{{ r.sender }}</div>
-                  <div class="tags">
-                    <span class="tag">{{ r.account }}</span>
-                    {% if r.new %}<span class="tag new" title="Added by the latest run">New</span>{% endif %}
-                    {% if r.source == "corrected" %}<span class="tag" title="You changed this from {{ r.model_priority }}">Corrected</span>
-                    {% elif r.source == "rule" %}<span class="tag" title="Set by a sender rule in Settings">Rule</span>{% endif %}
-                  </div>
-                </div>
-                <div class="c-main">
-                  <div class="subject">{% if r.gmail_url %}<a href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer" title="Open in Gmail">{{ r.subject or "(no subject)" }}</a>{% else %}{{ r.subject or "(no subject)" }}{% endif %}</div>
-                  <div class="reason">{{ r.reason }}</div>
-                </div>
-                <div class="c-end">
-                  <span class="time" title="{{ r.date }}">{{ r.time }}</span>
-                  <div class="row-actions">
-                    {% if r.gmail_url %}<a class="ghost icon" href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer" aria-label="Open in Gmail" title="Open in Gmail"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M8 2h4v4M12 2L6.5 7.5M10.5 8.5V12H2V3.5h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>{% endif %}
-                    <button class="ghost icon" data-do="fix" aria-label="Change priority" title="Wrong priority?"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 11.5V2.5M1.8 4.7L4 2.5l2.2 2.2M10 2.5v9M7.8 9.3l2.2 2.2 2.2-2.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                    <button class="ghost icon" data-status="done" aria-label="Done" title="Done"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                    <button class="ghost icon" data-status="ignored" aria-label="Ignore" title="Ignore"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
-                  </div>
-                </div>
-              </li>
-            {% endfor %}
-          </ul>
+          <ul class="list">{% for r in emails %}{{ mail_row(r) }}{% endfor %}</ul>
         </details>
       {% endfor %}
+      {% if older %}
+        <!-- past their priority's cutoff in Settings: hidden from the counts above, still here -->
+        <details class="group older" data-level="older">
+          <summary><h2 class="group-head">Older <span class="n"></span></h2></summary>
+          <p class="hint group-note">Unhandled emails past their cutoff ({{ hide_note }}). Change this in Settings.</p>
+          <ul class="list">{% for r in older %}{{ mail_row(r, older=True) }}{% endfor %}</ul>
+        </details>
+      {% endif %}
       <p class="empty" id="inbox-empty" hidden>Nothing needs you. Run now checks for new emails.</p>
     </section>
 
@@ -323,19 +379,18 @@
     {% for status, title, empty in [("done", "Completed", "Emails you mark Done show up here."),
                                      ("ignored", "Ignored", "Emails you ignore show up here.")] %}
       <section class="panel" id="panel-{{ status }}" role="tabpanel" hidden>
-        <ul class="card" id="{{ status }}-list">
+        <ul class="list" id="{{ status }}-list">
           {% for r in handled[status] %}
             <li class="row mail" data-account="{{ r.account }}" data-id="{{ r.id }}">
               <div class="c-who">
                 <div class="name" title="{{ r['from'] }}">{{ r.sender }}</div>
-                <div class="tags"><span class="tag">{{ r.account }}</span></div>
               </div>
               <div class="c-main">
-                <div class="subject">{% if r.gmail_url %}<a href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer" title="Open in Gmail">{{ r.subject or "(no subject)" }}</a>{% else %}{{ r.subject or "(no subject)" }}{% endif %}</div>
+                <div class="subject" title="{{ r.subject }}">{% if r.gmail_url %}<a href="{{ r.gmail_url }}" target="_blank" rel="noopener noreferrer" title="Open in Gmail">{{ r.subject or "(no subject)" }}</a>{% else %}{{ r.subject or "(no subject)" }}{% endif %}</div>
                 <div class="when">{{ title }} {{ r.when }}</div>
               </div>
               <div class="c-end">
-                <span class="time" title="{{ r.date }}">{{ r.time }}</span>
+                <span class="meta"><span class="time" title="{{ r.date }}">{{ r.time }}</span><span class="acct">{{ r.account }}</span></span>
                 <div class="row-actions"><button class="ghost restore">Restore</button></div>
               </div>
             </li>
@@ -347,89 +402,145 @@
 
     <!-- Settings: writes config.json -->
     <section class="panel" id="panel-settings" role="tabpanel" hidden>
-      <h3 class="section">Accounts</h3>
-      <ul class="card" id="accounts">
-        {% for a in accounts %}
-          <li class="row" data-label="{{ a.label }}">
-            <div>
-              <div class="who">
-                <span class="name">{{ a.label }}</span>
-                {% if a.login and a.login.state == "waiting" %}<span class="tag">Waiting for Google...</span>
-                {% elif a.signed_in %}<span class="tag ok">Signed in</span>
-                {% else %}<span class="tag">Not signed in</span>{% endif %}
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Accounts</h3>
+          <p class="hint">The Gmail accounts to triage. Sign-in opens Google in a new tab; use the address shown.</p>
+        </div>
+        <ul class="card" id="accounts">
+          {% for a in accounts %}
+            <li class="row" data-label="{{ a.label }}">
+              <div>
+                <div class="who">
+                  <span class="name">{{ a.label }}</span>
+                  {% if a.login and a.login.state == "waiting" %}<span class="tag">Waiting for Google...</span>
+                  {% elif a.signed_in %}<span class="tag ok">Signed in</span>
+                  {% else %}<span class="tag">Not signed in</span>{% endif %}
+                </div>
+                <div class="subject">{{ a.email }}</div>
+                {% if a.login and a.login.state == "error" %}<div class="reason error">{{ a.login.message }}</div>{% endif %}
               </div>
-              <div class="subject">{{ a.email }}</div>
-              {% if a.login and a.login.state == "error" %}<div class="reason error">{{ a.login.message }}</div>{% endif %}
-            </div>
-            <div class="actions">
-              <button class="ghost" data-do="login" {% if a.login and a.login.state == "waiting" %}disabled{% endif %}>
-                {{ "Sign in again" if a.signed_in else "Sign in" }}</button>
-              <button class="ghost danger" data-do="remove">Remove</button>
-            </div>
+              <div class="actions">
+                <button class="ghost" data-do="login" {% if a.login and a.login.state == "waiting" %}disabled{% endif %}>
+                  {{ "Sign in again" if a.signed_in else "Sign in" }}</button>
+                <button class="ghost danger" data-do="remove">Remove</button>
+              </div>
+            </li>
+          {% endfor %}
+          <li>
+            <form class="form" id="add-account">
+              <input type="text" name="label" placeholder="Label, e.g. school" required pattern="[a-z0-9_\-]{1,20}"
+                     title="1-20 lowercase letters, numbers, - or _" style="width:150px">
+              <input type="email" name="email" placeholder="Gmail address" required style="flex:1;min-width:180px">
+              <button class="ghost">Add account</button>
+            </form>
           </li>
-        {% endfor %}
-        <li>
-          <form class="form" id="add-account">
-            <input type="text" name="label" placeholder="Label, e.g. school" required pattern="[a-z0-9_\-]{1,20}"
-                   title="1-20 lowercase letters, numbers, - or _" style="width:160px">
-            <input type="email" name="email" placeholder="Gmail address" required style="flex:1;min-width:200px">
-            <button class="ghost">Add account</button>
-          </form>
-        </li>
-      </ul>
-      <p class="hint" style="margin:-20px 0 28px">Sign-in opens Google in a new tab. Use the address shown for that account.</p>
+        </ul>
+      </div>
 
-      <h3 class="section">Sender rules</h3>
-      <ul class="card" id="rules">
-        {% for sender, level in rules.items() %}
-          <li class="row" data-sender="{{ sender }}">
-            <div><div class="who"><span class="name">{{ sender }}</span></div>
-                 <div class="reason">Always {{ level }}. The model is skipped for this sender.</div></div>
-            <div class="actions"><button class="ghost danger" data-do="remove-rule">Remove</button></div>
-          </li>
-        {% else %}
-          <li class="form hint">No rules yet. After you correct the same sender twice, you'll be offered one.</li>
-        {% endfor %}
-      </ul>
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Sender rules</h3>
+          <p class="hint">Senders that always get the same priority. The model is skipped for them.</p>
+        </div>
+        <ul class="card" id="rules">
+          {% for sender, level in rules.items() %}
+            <li class="row" data-sender="{{ sender }}">
+              <div><div class="who"><span class="name">{{ sender }}</span></div>
+                   <div class="reason">Always {{ level }}</div></div>
+              <div class="actions"><button class="ghost danger" data-do="remove-rule">Remove</button></div>
+            </li>
+          {% else %}
+            <li class="form hint">No rules yet. After you correct the same sender twice, you'll be offered one.</li>
+          {% endfor %}
+        </ul>
+      </div>
 
-      <h3 class="section">Corrections <span class="hint">({{ correction_count }}, shown to the model as examples)</span></h3>
-      <ul class="card" id="corrections">
-        {% for c in corrections %}
-          <li class="row" data-key="{{ c.key }}">
-            <div>
-              <div class="who"><span class="name">{{ c.subject or "(no subject)" }}</span></div>
-              <div class="subject">{{ c.from }}</div>
-              <div class="reason">{{ c.old|capitalize }} &rarr; {{ c.new|capitalize }}{% if c.note %}. Why: {{ c.note }}{% endif %}</div>
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Corrections <span class="hint">{{ correction_count }}</span></h3>
+          <p class="hint">Priorities you fixed. The most relevant ones are shown to the model as examples on each run.</p>
+        </div>
+        <ul class="card" id="corrections">
+          {% for c in corrections %}
+            <li class="row" data-key="{{ c.key }}">
+              <div>
+                <div class="who"><span class="name">{{ c.subject or "(no subject)" }}</span></div>
+                <div class="subject">{{ c.from }}</div>
+                <div class="reason">{{ c.old|capitalize }} &rarr; {{ c.new|capitalize }}{% if c.note %}. Why: {{ c.note }}{% endif %}</div>
+              </div>
+              <div class="actions"><button class="ghost danger" data-do="remove-correction">Remove</button></div>
+            </li>
+          {% else %}
+            <li class="form hint">Use the priority button on an email to correct it.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Appearance</h3>
+          <p class="hint">Saved in this browser.</p>
+        </div>
+        <div class="card"><div class="form">
+          <div class="segmented" id="theme" role="group" aria-label="Theme">
+            <button data-theme="system">System</button><button data-theme="light">Light</button><button data-theme="dark">Dark</button>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">What to fetch</h3>
+          <p class="hint">Each run asks Gmail for the newest emails matching the search, up to the limit per account.
+            Emails classified before are skipped, so only new ones go to the model. Nothing in Gmail is changed.</p>
+        </div>
+        <form class="card" id="fetch-settings">
+          <div class="field">
+            <span class="label" id="range-label">Time range</span>
+            <div class="segmented" id="range" role="group" aria-labelledby="range-label">
+              <button type="button" data-range="1d">1 day</button><button type="button" data-range="2d">2 days</button><button type="button" data-range="7d">1 week</button><button type="button" data-range="14d">2 weeks</button><button type="button" data-range="1m">1 month</button>
             </div>
-            <div class="actions"><button class="ghost danger" data-do="remove-correction">Remove</button></div>
-          </li>
-        {% else %}
-          <li class="form hint">Use the priority button on an email to correct it. Corrections teach the model on the next run.</li>
-        {% endfor %}
-      </ul>
+            <span class="hint">Sets <code>newer_than</code> in the search below. Longer ranges take longer to classify the first time.</span>
+          </div>
+          <div class="field">
+            <label for="query">Gmail search</label>
+            <input type="text" id="query" name="query" value="{{ config.query }}" required maxlength="200">
+            <span class="hint">Any search that works in Gmail's search bar. Click an example to use it:</span>
+            <ul class="examples">
+              <li><button type="button">in:inbox newer_than:2d</button> recent inbox</li>
+              <li><button type="button">is:unread newer_than:7d</button> unread from the last week</li>
+              <li><button type="button">in:inbox -category:promotions -category:social newer_than:3d</button> skip Promotions and Social</li>
+              <li><button type="button">is:important newer_than:3d</button> only what Gmail marks Important</li>
+              <li><button type="button">from:ucsb.edu newer_than:7d</button> from one school or company</li>
+              <li><button type="button">has:attachment newer_than:7d</button> emails with attachments</li>
+            </ul>
+          </div>
+          <div class="field">
+            <label for="limit">Emails per account</label>
+            <input type="number" id="limit" name="limit" value="{{ config.limit }}" min="1" max="100" required>
+            <span class="hint">The newest 1-100 matching emails per account, per run. If more new emails than this arrive between runs, the older ones are missed: raise it or run more often.</span>
+          </div>
+          <div class="form"><button class="ghost">Save</button><span class="msg" id="settings-msg"></span></div>
+        </form>
+      </div>
 
-      <h3 class="section">Appearance</h3>
-      <div class="card"><div class="form">
-        <div class="segmented" id="theme" role="group" aria-label="Theme">
-          <button data-theme="system">System</button><button data-theme="light">Light</button><button data-theme="dark">Dark</button>
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Hide old emails</h3>
+          <p class="hint">Emails you haven't handled leave the Inbox after this many days and move to Older at the bottom. Nothing is deleted. Leave blank to never hide.</p>
         </div>
-        <span class="hint">Saved in this browser</span>
-      </div></div>
-
-      <h3 class="section">What to fetch</h3>
-      <form class="card" id="fetch-settings">
-        <div class="field">
-          <label for="query">Gmail search</label>
-          <input type="text" id="query" name="query" value="{{ config.query }}" required maxlength="200">
-          <span class="hint">Any Gmail search, e.g. <code>in:inbox newer_than:2d</code> or <code>is:unread</code></span>
-        </div>
-        <div class="field">
-          <label for="limit">Emails per account</label>
-          <input type="number" id="limit" name="limit" value="{{ config.limit }}" min="1" max="100" required>
-          <span class="hint">Max emails fetched from each account per run (1-100)</span>
-        </div>
-        <div class="form"><button class="ghost">Save</button><span class="msg" id="settings-msg"></span></div>
-      </form>
+        <form class="card" id="hide-settings">
+          {% for level in ["high", "medium", "low"] %}
+            <div class="field inline">
+              <label for="hide-{{ level }}">{{ level|capitalize }}</label>
+              <span><input type="number" id="hide-{{ level }}" name="{{ level }}" min="1" max="365" placeholder="Never"
+                           value="{{ hide_after[level] if hide_after[level] is not none else '' }}"> days</span>
+            </div>
+          {% endfor %}
+          <div class="form"><button class="ghost">Save</button><span class="msg" id="hide-msg"></span></div>
+        </form>
+      </div>
     </section>
   </main>
   </div>
@@ -458,6 +569,7 @@
         if (tab.dataset.tab === name) document.getElementById("panel-title").textContent = tab.dataset.title;
       }
       for (const panel of document.querySelectorAll(".panel")) panel.hidden = panel.id !== `panel-${name}`;
+      document.getElementById("run").hidden = name === "settings";   // Settings has its own job
       history.replaceState(null, "", name === "inbox" ? location.pathname : `#${name}`);
       updateCounts();
     }
@@ -491,7 +603,8 @@
         group.hidden = n === 0;
         if (n) parts.push(`${n} ${group.dataset.level}`);
       }
-      const inbox = document.querySelectorAll("#panel-inbox .email:not([hidden])").length;
+      // Older emails are past their cutoff, so they do not count as needing you
+      const inbox = document.querySelectorAll("#panel-inbox .group:not(.older) .email:not([hidden])").length;
       document.getElementById("inbox-empty").hidden = inbox > 0;
 
       const counts = {inbox};
@@ -508,7 +621,7 @@
 
       // account counts follow the view you're on (Settings shows the inbox's)
       const view = currentTab === "settings" ? "inbox" : currentTab;
-      const rows = [...document.querySelectorAll(`#panel-${view} .mail`)];
+      const rows = [...document.querySelectorAll(view === "inbox" ? "#panel-inbox .group:not(.older) .mail" : `#panel-${view} .mail`)];
       for (const b of filterButtons) {
         const n = b.dataset.account === "all" ? rows.length
                 : rows.filter(r => r.dataset.account === b.dataset.account).length;
@@ -516,7 +629,7 @@
       }
 
       document.getElementById("summary").textContent =
-        currentTab === "inbox" ? (parts.join(" · ") || " ")
+        currentTab === "inbox" ? parts.join(" · ")
         : currentTab === "settings" ? "Saved to config.json"
         : `${counts[currentTab]} email${counts[currentTab] === 1 ? "" : "s"}`;
     }
@@ -571,7 +684,7 @@
       li.hidden = false;
       delete li.dataset.model;
       li.querySelector(".fix")?.remove();
-      for (const tag of [...li.querySelectorAll(".tags .tag")].slice(1)) tag.remove();   // keep the account tag
+      li.querySelector(".tags")?.remove();   // New / Corrected / Rule only matter in the inbox
       const when = document.createElement("div");
       when.className = "when";
       when.textContent = `${label} just now`;
@@ -638,7 +751,7 @@
     function openFix(row) {
       const open = row.querySelector(".fix");
       if (open) return open.remove();   // second click closes it
-      const current = row.closest(".group").dataset.level;
+      const current = row.dataset.priority;
       let choice = current;
 
       const panel = document.createElement("div");
@@ -726,6 +839,36 @@
       const {ok, data} = await post("/accounts", {label: form.label.value, email: form.email.value});
       if (ok) location.reload();
       else showError(data.error || "Could not add account.");
+    });
+
+    // time range buttons and examples edit the search box; Save stores it
+    const query = document.getElementById("query");
+    const RANGE = /newer_than:\w+/;
+    function markRange() {
+      const current = query.value.match(RANGE)?.[0].slice("newer_than:".length);
+      for (const b of document.querySelectorAll("#range button")) b.setAttribute("aria-pressed", b.dataset.range === current);
+    }
+    for (const b of document.querySelectorAll("#range button")) b.addEventListener("click", () => {
+      const range = `newer_than:${b.dataset.range}`;
+      query.value = RANGE.test(query.value) ? query.value.replace(RANGE, range) : `${query.value.trim()} ${range}`.trim();
+      markRange();
+    });
+    for (const b of document.querySelectorAll(".examples button")) b.addEventListener("click", () => {
+      query.value = b.textContent;
+      markRange();
+    });
+    query.addEventListener("input", markRange);
+    markRange();
+
+    document.getElementById("hide-settings").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.target;
+      const msg = document.getElementById("hide-msg");
+      const hide_after = {high: form.high.value, medium: form.medium.value, low: form.low.value};
+      const {ok, data} = await post("/settings", {hide_after});
+      if (ok) return location.reload();   // regroup the Inbox with the new cutoffs
+      msg.className = "msg error";
+      msg.textContent = data.error || "Could not save.";
     });
 
     document.getElementById("fetch-settings").addEventListener("submit", async (event) => {

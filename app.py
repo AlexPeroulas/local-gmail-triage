@@ -7,7 +7,8 @@ from flask import Flask, abort, jsonify, render_template, request
 from gmail_client import login, get_address, is_signed_in, token_path, NotSignedIn
 from store import (load_results, load_actions, save_actions, action_key,
                    load_meta, load_config, save_config, sender_address,
-                   load_corrections, save_corrections, load_rules, save_rules, effective_priority)
+                   load_corrections, save_corrections, load_rules, save_rules, effective_priority,
+                   DEFAULT_HIDE_AFTER)
 from triage import run_triage
 
 app = Flask(__name__)
@@ -116,10 +117,18 @@ def index():
     for items in handled.values():
         items.sort(key=lambda r: r["at"], reverse=True)
 
+    # unhandled emails past their priority's cutoff go to "Older" (hidden, not deleted)
+    hide_after = {**DEFAULT_HIDE_AFTER, **config.get("hide_after", {})}
+    def is_old(r):
+        days = hide_after.get(r["priority"])
+        return days is not None and r["dt"] is not None and now - r["dt"] > timedelta(days=days)
     active = [r for r in results if action_key(r) not in actions]
+    older = [r for r in active if is_old(r)]
+    hide_note = ", ".join(f"{level} after {days} day{'s' if days != 1 else ''}"
+                          for level, days in hide_after.items() if days is not None)
     groups = {}   # priority -> emails
     for level in LEVELS:
-        level_group = [r for r in active if r["priority"] == level]
+        level_group = [r for r in active if r["priority"] == level and not is_old(r)]
         if level_group:
             groups[level] = level_group
 
@@ -138,7 +147,7 @@ def index():
     recent_corrections = sorted(({"key": k, **c} for k, c in corrections.items()),
                                 key=lambda c: c["at"], reverse=True)[:20]
 
-    return render_template("index.html", groups=groups, handled=handled, state=run_state,
+    return render_template("index.html", groups=groups, older=older, hide_after=hide_after, hide_note=hide_note, handled=handled, state=run_state,
                            last_checked=last_checked, config=config, accounts=accounts,
                            filter_accounts=filter_accounts, rules=rules["rules"],
                            corrections=recent_corrections, correction_count=len(corrections))
@@ -260,21 +269,42 @@ def bad_request(message):
 
 @app.post("/settings")
 def save_settings():
-    # body: {"query": "...", "limit": 20}
+    # body: {"query": "...", "limit": 20} and/or {"hide_after": {"high": null, "medium": 10, "low": 2}}
     data = request.get_json(silent=True) or {}
-    query = str(data.get("query", "")).strip()
-    try:
-        limit = int(data.get("limit"))
-    except (TypeError, ValueError):
-        return bad_request("Limit must be a number.")
-    if not query or len(query) > 200:
-        return bad_request("Query can't be empty (max 200 characters).")
-    if not 1 <= limit <= 100:
-        return bad_request("Limit must be between 1 and 100.")
+    update = {}
+    if "query" in data or "limit" in data:
+        query = str(data.get("query", "")).strip()
+        try:
+            limit = int(data.get("limit"))
+        except (TypeError, ValueError):
+            return bad_request("Limit must be a number.")
+        if not query or len(query) > 200:
+            return bad_request("Query can't be empty (max 200 characters).")
+        if not 1 <= limit <= 100:
+            return bad_request("Limit must be between 1 and 100.")
+        update.update(query=query, limit=limit)
+    if "hide_after" in data:
+        raw = data["hide_after"] if isinstance(data["hide_after"], dict) else {}
+        hide_after = {}
+        for level in LEVELS:
+            value = raw.get(level)
+            if value in (None, ""):
+                hide_after[level] = None   # never hide
+                continue
+            try:
+                days = int(value)
+            except (TypeError, ValueError):
+                return bad_request("Days must be a number.")
+            if not 1 <= days <= 365:
+                return bad_request("Days must be between 1 and 365, or blank for never.")
+            hide_after[level] = days
+        update["hide_after"] = hide_after
+    if not update:
+        return bad_request("Nothing to save.")
 
     with config_lock:
         config = load_config(required=False)
-        config.update(query=query, limit=limit)
+        config.update(update)
         save_config(config)
     return jsonify(ok=True)
 

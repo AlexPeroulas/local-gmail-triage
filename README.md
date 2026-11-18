@@ -31,8 +31,8 @@ Priority shown = your correction, else a sender rule, else the model's answer.
 ### 2. Get the code and install dependencies
 
 ```bash
-git clone https://github.com/AlexPeroulas/GmailLocalMCPTriage.git
-cd GmailLocalMCPTriage
+git clone https://github.com/AlexPeroulas/local-gmail-triage.git
+cd local-gmail-triage
 
 python -m venv .venv
 # Windows:
@@ -56,7 +56,14 @@ ollama list          # gemma4:e4b should be listed
 
 Ollama runs in the background on `http://localhost:11434` after install. If it isn't running, start it with `ollama serve`.
 
-To use a different model, change `"model"` in `classify()` in `triage.py`.
+To use a different model, change `"model"` in `classify()` in `triage.py`. Any chat model in Ollama works; pick by your RAM:
+
+| Model | Good for | Notes |
+| --- | --- | --- |
+| `gemma4:e4b` | 16 GB RAM (default) | Fast, good enough for a 3-level sort |
+| `gemma4:e2b` | 8 GB RAM / older laptops | Faster, less accurate |
+| `qwen3:8b` | 16 GB RAM | Slower than e4b in testing; keep thinking off (the app already sends `"think": false`) |
+| `gemma3:12b` | 16 GB+ with a GPU | Larger; may be more accurate, noticeably slower |
 
 #### Optional: run the model on your GPU
 
@@ -69,7 +76,7 @@ Ollama uses NVIDIA and AMD graphics cards automatically. For **Intel integrated 
    [Environment]::SetEnvironmentVariable("OLLAMA_IGPU_ENABLE", "1", "User")
    ```
    macOS / Linux: add `export OLLAMA_VULKAN=1 OLLAMA_IGPU_ENABLE=1` to your shell profile.
-3. Quit Ollama (tray icon), close all terminals, and start Ollama again.
+3. Quit Ollama (right-click the tray icon → Quit), close all terminals, then start it again: open a new terminal and run `ollama serve` (keep that window open), or start Ollama from the Start menu.
 4. Check it:
    ```bash
    ollama run gemma4:e4b --verbose --think=false "Explain what an inbox is in 3 sentences."
@@ -77,7 +84,7 @@ Ollama uses NVIDIA and AMD graphics cards automatically. For **Intel integrated 
    ```
    Compare the **eval rate** with and without the GPU. The first run after starting Ollama is slower while the model loads.
 
-To turn it off, set both variables to `$null` the same way and restart Ollama. Vulkan support in Ollama is still marked experimental; the variable names may change between versions.
+To turn it off, set both variables to `$null` the same way and restart Ollama (quit it from the tray, then `ollama serve`). Vulkan support in Ollama is still marked experimental; the variable names may change between versions.
 
 ### 4. Create Gmail API credentials
 
@@ -114,13 +121,17 @@ cp config.example.json config.json      # Windows cmd: copy config.example.json 
     "school": "you@school.edu"
   },
   "query": "in:inbox newer_than:1d",
-  "limit": 20
+  "limit": 20,
+  "hide_after": {"high": null, "medium": 10, "low": 2}
 }
 ```
 
 - `accounts`: a short label for each Gmail address. Use as many or as few as you like.
 - `query`: any Gmail search query, e.g. `in:inbox newer_than:2d` or `is:unread`.
 - `limit`: max emails fetched per account per run. Lower it while testing to save time.
+- `hide_after`: days before an unhandled email of that priority leaves the Inbox (`null` = never). Optional; these are the defaults.
+
+All of these can also be changed in the web app under **Settings**.
 
 > `config.json` holds your email addresses, so it's git-ignored.
 
@@ -174,10 +185,21 @@ Open **http://127.0.0.1:5000**. The app only accepts connections from your own c
 - **Accounts** (sidebar): show one account at a time.
 - **Run now:** fetches and classifies new emails, with live progress. The title row shows when it last checked and how fast the model ran (seconds per email, tokens/s). The terminal prints the same numbers for each email.
 - **Dark mode:** the moon / sun button in the sidebar, or **Settings → Appearance** to follow your system.
-- **Settings:** add or remove accounts, sign in to each one, and change the Gmail search and limit. Saved to `config.json`.
+- **Older:** unhandled emails past a cutoff (by default low after 2 days, medium after 10, high never) leave the priority groups and move to **Older**, collapsed at the bottom of the Inbox. Nothing is deleted. Change the days in **Settings → Hide old emails**.
+- **Settings:** add or remove accounts, sign in to each one, change the Gmail search (with a time-range picker and examples), the limit, and the hide-old cutoffs. Saved to `config.json`.
 - **Priority:** wrong call? Hover a row, click the **Priority** button (⇅), pick the right level and optionally say why. Corrections are shown to the model as examples on the next run. Correct the same sender twice and you'll be offered a **sender rule** that skips the model for that sender. Manage both in Settings.
 
 New user? You can skip steps 5 and 6 above: start `app.py`, open **Settings**, add your accounts and click **Sign in** on each.
+
+### What a run does
+
+1. For each account, asks Gmail for the **newest** emails matching your search, up to `limit`.
+2. **Skips emails it has already classified**, so only new ones go to the model. Running twice in a row costs almost nothing.
+3. Classifies the new ones and adds them to `data/results.json`.
+
+Nothing in Gmail changes: the app can't mark, move or delete email. If more than `limit` new emails arrive between runs, the oldest of them are never fetched; raise the limit or run more often.
+
+**Where old emails are kept:** everything ever classified stays in `data/results.json` (sender, subject, date, priority and reason; never the body). Done / Ignored, hiding and Older only change what the app shows. Deleting `data/results.json` starts fresh: the next run reclassifies whatever your search returns.
 
 ### From the command line
 
@@ -245,11 +267,11 @@ On macOS / Linux, use cron instead:
 - **Open in Gmail** uses a link format Google doesn't officially document. It could stop working.
 - Tokens expire after 7 days while the OAuth app is in Testing mode, so you have to run `python login.py` about once a week.
 - Only plain-text email bodies are read. HTML-only emails are classified from the subject and preview. Bodies are cut off at 1,000 characters.
-- `results.json` and the digest grow forever. Old results are never removed.
+- `results.json` grows forever. Older only hides emails in the app; nothing is removed from the file. The static digest (`data/digest.html`) still shows every unhandled email.
 
 ## Roadmap
 
-- Retention: drop old low / medium emails automatically; high stays until handled
+- Remove entries older than a few months from `results.json`
 - Deadline detection, so emails stay until a few days after their deadline
 - Retry and clearer errors when Ollama is down or returns bad output
 - Keyboard shortcuts (`j` / `k`, `e` for Done)
