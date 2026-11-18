@@ -58,7 +58,12 @@ def classify(email, examples=()):
     response = requests.post("http://localhost:11434/api/chat", json=payload)
     reply = response.json()
     answer = json.loads(reply["message"]["content"])
-    return answer["priority"], answer["reason"]
+    ns = 1e9   # Ollama reports durations in nanoseconds
+    stats = {"seconds": reply.get("total_duration", 0) / ns,
+             "load": reply.get("load_duration", 0) / ns,
+             "tokens": reply.get("eval_count", 0),
+             "tok_s": reply.get("eval_count", 0) / max(reply.get("eval_duration", 0) / ns, 1e-9)}
+    return answer["priority"], answer["reason"], stats
 
 
 class TriageError(Exception):
@@ -104,6 +109,7 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
     corrections = load_corrections()
     rules = load_rules()["rules"]
     added = 0
+    timings = []   # Ollama stats per model call
     run_id = datetime.now().isoformat(timespec="seconds")   # tags every email added by this run
 
     for account, svc in services.items():
@@ -119,7 +125,10 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
             if sender in rules:   # your rule decides; no need to ask the model
                 priority, reason = rules[sender], f"Sender rule: always {rules[sender]}"
             else:
-                priority, reason = classify(e, pick_examples(corrections, sender))
+                priority, reason, s = classify(e, pick_examples(corrections, sender))
+                timings.append(s)
+                print(f"  {account} {i}/{len(new)}: {s['seconds']:.1f}s "
+                      f"(load {s['load']:.1f}s), {s['tokens']} tokens, {s['tok_s']:.1f} tok/s")
             results.append({
                 "id": e["id"], "account": account, "from": e["from"],
                 "subject": e["subject"], "date": e["date"],
@@ -130,7 +139,14 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
             write_html(results, done=False)
 
     write_html(results, done=True)
-    save_meta({"last_run": datetime.now().isoformat(timespec="seconds"), "run": run_id, "added": added})
+    speed = ""
+    if timings:
+        total = sum(t["seconds"] for t in timings)
+        speed = (f"{total / len(timings):.1f}s per email, "
+                 f"{sum(t['tok_s'] for t in timings) / len(timings):.0f} tok/s")
+        print(f"Model: {total:.0f}s total, {speed}")
+    save_meta({"last_run": datetime.now().isoformat(timespec="seconds"), "run": run_id,
+               "added": added, "speed": speed})
     progress(f"Finished: {added} new emails")
 
 if __name__ == "__main__":

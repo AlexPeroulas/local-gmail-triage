@@ -127,6 +127,8 @@ def index():
     if meta.get("last_run"):
         last_run = datetime.fromisoformat(meta["last_run"]).astimezone()
         last_checked = f"Checked {day_and_clock(last_run, now)} · {meta.get('added', 0)} new"
+        if meta.get("speed"):
+            last_checked += f" · {meta['speed']}"
 
     accounts = [{"label": label, "email": email, "signed_in": is_signed_in(label), "login": logins.get(label)}
                 for label, email in config["accounts"].items()]

@@ -43,6 +43,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+> On Windows PowerShell, if activating fails with "running scripts is disabled", run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and try again.
+
 ### 3. Set up the local model
 
 Install Ollama, then pull the model:
@@ -55,6 +57,27 @@ ollama list          # gemma4:e4b should be listed
 Ollama runs in the background on `http://localhost:11434` after install. If it isn't running, start it with `ollama serve`.
 
 To use a different model, change `"model"` in `classify()` in `triage.py`.
+
+#### Optional: run the model on your GPU
+
+Ollama uses NVIDIA and AMD graphics cards automatically. For **Intel integrated graphics** (e.g. Intel Arc in Core Ultra laptops), it runs on the CPU by default. On a Core Ultra 7 256V, turning on the GPU made `gemma4:e4b` about 3x faster (roughly 10 → 30 tokens/s).
+
+1. Update Ollama and your graphics driver.
+2. Turn on Vulkan and allow integrated GPUs (Windows PowerShell):
+   ```powershell
+   [Environment]::SetEnvironmentVariable("OLLAMA_VULKAN", "1", "User")
+   [Environment]::SetEnvironmentVariable("OLLAMA_IGPU_ENABLE", "1", "User")
+   ```
+   macOS / Linux: add `export OLLAMA_VULKAN=1 OLLAMA_IGPU_ENABLE=1` to your shell profile.
+3. Quit Ollama (tray icon), close all terminals, and start Ollama again.
+4. Check it:
+   ```bash
+   ollama run gemma4:e4b --verbose --think=false "Explain what an inbox is in 3 sentences."
+   ollama ps        # PROCESSOR should say GPU, not 100% CPU
+   ```
+   Compare the **eval rate** with and without the GPU. The first run after starting Ollama is slower while the model loads.
+
+To turn it off, set both variables to `$null` the same way and restart Ollama. Vulkan support in Ollama is still marked experimental; the variable names may change between versions.
 
 ### 4. Create Gmail API credentials
 
@@ -149,7 +172,7 @@ Open **http://127.0.0.1:5000**. The app only accepts connections from your own c
 - **Row actions** (on hover): **Open in Gmail**, **Priority**, **Done**, **Ignore**. Done and Ignore can be undone.
 - **Completed / Ignored:** everything you've handled, with **Restore**.
 - **Accounts** (sidebar): show one account at a time.
-- **Run now:** fetches and classifies new emails, with live progress. The title row shows when it last checked.
+- **Run now:** fetches and classifies new emails, with live progress. The title row shows when it last checked and how fast the model ran (seconds per email, tokens/s). The terminal prints the same numbers for each email.
 - **Dark mode:** the moon / sun button in the sidebar, or **Settings → Appearance** to follow your system.
 - **Settings:** add or remove accounts, sign in to each one, and change the Gmail search and limit. Saved to `config.json`.
 - **Priority:** wrong call? Hover a row, click the **Priority** button (⇅), pick the right level and optionally say why. Corrections are shown to the model as examples on the next run. Correct the same sender twice and you'll be offered a **sender rule** that skips the model for that sender. Manage both in Settings.
@@ -192,7 +215,8 @@ On macOS / Linux, use cron instead:
 | `config.json not found` | Copy `config.example.json` to `config.json` and fill in your accounts (step 5). |
 | `ConnectionError` to `localhost:11434` | Ollama isn't running. Start it with `ollama serve`. |
 | `model not found` | Run `ollama pull gemma4:e4b`. |
-| Fewer emails than expected | Raise `LIMIT` at the top of `triage.py`. |
+| Fewer emails than expected | Raise the limit in **Settings** (or `"limit"` in `config.json`), or widen the query (e.g. `newer_than:3d`). |
+| Classifying is slow | Check `ollama ps`. If it says `100% CPU`, see **Optional: run the model on your GPU**. |
 
 ## Privacy and security
 
