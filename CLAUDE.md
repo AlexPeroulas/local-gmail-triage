@@ -20,6 +20,7 @@ Local email priority tool. Reads Gmail (read-only), classifies each email with a
 - corrections.json: priority fixes; up to 8 are shown to the model as examples (triage.pick_examples). Written only by app.py
 - rules.json: sender address -> priority; skips the model. Written only by app.py
 - meta.json: last run time, run id, number added, model speed. Written only by triage.py
+- speed.log: per-email model timings (account label only, no email content). Written only by triage.py
 - token_<label>.json: Google sign-in tokens
 
 ## Privacy rules

@@ -6,6 +6,7 @@ from store import (load_results, save_results, load_config, save_meta,
 from datetime import datetime
 from render import write_html
 from login import sign_in
+import store
 import sys
 import webbrowser
 
@@ -41,13 +42,26 @@ def examples_text(examples):
             + "\n".join(lines))
 
 
+MODEL = "gemma4:e4b"
+KEEP_ALIVE = "5m"   # how long Ollama keeps the model in memory after the last request
+
+
+def warm_up():
+    # an empty request loads the model so the first email isn't slowed by the load
+    try:
+        requests.post("http://localhost:11434/api/generate",
+                      json={"model": MODEL, "keep_alive": KEEP_ALIVE}, timeout=120)
+    except requests.RequestException:
+        pass   # Ollama not running: Run now reports that itself
+
+
 def classify(email, examples=()):
     email_text = f"From: {email['from']}\nSubject: {email['subject']}\nPreview: {email['snippet']}\nBody: {email['body']}"
     prompt = prompt_instructions + examples_text(examples) + "\nEmail: " + email_text
 
     payload = {
-        "model": "gemma4:e4b",
-        "keep_alive": "1m",
+        "model": MODEL,
+        "keep_alive": KEEP_ALIVE,
         "think": False,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
@@ -64,6 +78,15 @@ def classify(email, examples=()):
              "tokens": reply.get("eval_count", 0),
              "tok_s": reply.get("eval_count", 0) / max(reply.get("eval_duration", 0) / ns, 1e-9)}
     return answer["priority"], answer["reason"], stats
+
+
+def log_speed(line):
+    # timings only (account label, no email content), so the file is safe to open
+    line = f"{datetime.now():%Y-%m-%d %H:%M:%S}  {line}"
+    print(line)
+    store.DATA.mkdir(exist_ok=True)
+    with open(store.DATA / "speed.log", "a", encoding="utf-8") as f:
+        f.write(line + "\n")
 
 
 class TriageError(Exception):
@@ -127,8 +150,8 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
             else:
                 priority, reason, s = classify(e, pick_examples(corrections, sender))
                 timings.append(s)
-                print(f"  {account} {i}/{len(new)}: {s['seconds']:.1f}s "
-                      f"(load {s['load']:.1f}s), {s['tokens']} tokens, {s['tok_s']:.1f} tok/s")
+                log_speed(f"{account} {i}/{len(new)}: {s['seconds']:.1f}s "
+                          f"(load {s['load']:.1f}s), {s['tokens']} tokens, {s['tok_s']:.1f} tok/s")
             results.append({
                 "id": e["id"], "account": account, "from": e["from"],
                 "subject": e["subject"], "date": e["date"],
@@ -144,7 +167,7 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
         total = sum(t["seconds"] for t in timings)
         speed = (f"{total / len(timings):.1f}s per email, "
                  f"{sum(t['tok_s'] for t in timings) / len(timings):.0f} tok/s")
-        print(f"Model: {total:.0f}s total, {speed}")
+        log_speed(f"Run {run_id} done: {len(timings)} emails, {total:.0f}s total, {speed}")
     save_meta({"last_run": datetime.now().isoformat(timespec="seconds"), "run": run_id,
                "added": added, "speed": speed})
     progress(f"Finished: {added} new emails")

@@ -6,6 +6,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 import base64
+from html.parser import HTMLParser
 
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -65,9 +66,9 @@ def is_signed_in(account):
 def get_address(svc):
     return svc.users().getProfile(userId="me").execute()["emailAddress"]
 
-def get_body(payload):
-    # Case 1: this piece is plain text, so decode and return it
-    if payload.get("mimeType") == "text/plain":
+def get_body(payload, mime="text/plain"):
+    # Case 1: this piece has the type we want, so decode and return it
+    if payload.get("mimeType") == mime:
         data = payload.get("body", {}).get("data", "")
         if data:
             data += "=" * (-len(data) % 4)   # fix missing base64 padding
@@ -75,12 +76,34 @@ def get_body(payload):
 
     # Case 2: this piece contains smaller pieces, so search inside them
     for part in payload.get("parts", []):
-        text = get_body(part)
+        text = get_body(part, mime)
         if text:
             return text
 
     # Nothing found
     return ""
+
+class _TextOnly(HTMLParser):
+    # keeps visible text, drops tags plus <style>/<script>/<head> contents
+    def __init__(self):
+        super().__init__()
+        self.parts, self.skip = [], 0
+    def handle_starttag(self, tag, attrs):
+        self.skip += tag in ("style", "script", "head")
+    def handle_endtag(self, tag):
+        self.skip -= tag in ("style", "script", "head") and self.skip > 0
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+def html_to_text(html):
+    p = _TextOnly()
+    p.feed(html)
+    return " ".join(" ".join(p.parts).split())
+
+def get_text(payload):
+    # plain text if the email has it, otherwise the HTML part with tags stripped
+    return get_body(payload) or html_to_text(get_body(payload, "text/html"))
 
 def get_recent_emails(svc, query, limit):
 
@@ -101,7 +124,7 @@ def get_recent_emails(svc, query, limit):
             "subject" : h.get("Subject", ""),
             "date" : h.get("Date", ""),
             "snippet" : msg.get("snippet", ""),
-            "body": get_body(msg["payload"])[:1000],
+            "body": get_text(msg["payload"])[:1000],
         }) 
 
     return emails

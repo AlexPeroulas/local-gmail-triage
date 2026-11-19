@@ -1,3 +1,4 @@
+import logging
 import re
 import threading
 from datetime import datetime, timedelta, timezone
@@ -9,9 +10,11 @@ from store import (load_results, load_actions, save_actions, action_key,
                    load_meta, load_config, save_config, sender_address,
                    load_corrections, save_corrections, load_rules, save_rules, effective_priority,
                    DEFAULT_HIDE_AFTER)
-from triage import run_triage
+from triage import run_triage, warm_up
 
 app = Flask(__name__)
+# the page polls /status every second during a run; keep those out of the console
+logging.getLogger("werkzeug").addFilter(lambda r: "/status" not in r.getMessage())
 ALLOWED_HOSTS = {"127.0.0.1:5000", "localhost:5000"}
 LEVELS = ("high", "medium", "low")
 LABEL_RE = re.compile(r"[a-z0-9_-]{1,20}")
@@ -375,5 +378,6 @@ def status():
 
 
 if __name__ == "__main__":
+    threading.Thread(target=warm_up, daemon=True).start()
     # 127.0.0.1 only: reachable from this computer, never the network
     app.run(host="127.0.0.1", port=5000, debug=True)
