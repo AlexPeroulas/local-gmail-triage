@@ -209,7 +209,7 @@ Nothing in Gmail changes: the app can't mark, move or delete email.
 
 The **Dataset** tab collects confirmed priorities in `data/labels.json`, for training and testing your own classifier against the model.
 
-- **Review:** one email at a time, in random order, with the model's answer. Pick a **type** (its letter key), then a priority: `1` High, `2` Medium, `3` Low (starts on the model's pick), then `Enter` or **Confirm** to save. `S` skip, `U` undo. The subject opens the email in Gmail. Judge each email as of when it arrived. Priority fixes from the Inbox are saved as labels too. **All labelled emails** (under Labels) lists every label, newest first, with type, your label, the model's and train / test / made-up.
+- **Review:** one email at a time, in random order, with the model's answer. Pick a **type** (its letter key), then a priority: `1` High, `2` Medium, `3` Low (starts on the model's pick), then `Enter` or **Confirm** to save. `S` skip, `U` undo. The subject opens the email in Gmail. Judge each email as of when it arrived. Priority fixes from the Inbox are saved as labels too. **All labelled emails** (under Labels) lists every label, newest first, with type, your label, the model's and train / test / made-up. Change a type or priority there (saved right away) or **Delete** a label; a deleted real email goes back to Review.
 - **What the model sees:** under the controls, the exact sender, subject, preview and first 1,000 characters of body the model gets, loaded live from Gmail (read-only) and never stored. **Full prompt** shows the instructions, correction examples and sender instruction as they'd be today.
 - **Collect more:** fetch and classify up to N not-yet-classified emails per account for a range you pick (1 month to 1 year), without changing Settings. Collected emails go to Review only, never the Inbox, and don't change what counts as New.
 - **Types:** one per line, editable in the Dataset tab. Defaults: career, school: classes, school: admin, housing / landlord, money, security / account, clubs / events, personal, social / notifications, newsletter / promo, other. Pick by what the email is about; the sender breaks ties (a mass email from the registrar is school: admin). Split a type ("career: interview") only once it has about 100 examples.
@@ -222,6 +222,42 @@ The **Dataset** tab collects confirmed priorities in `data/labels.json`, for tra
   ```
 
 Labels from your emails store sender, subject, date, type and both priorities, never the body. Made-up emails keep their body, since they're not real.
+
+#### Labelling guide
+
+Consistency matters more than getting every borderline call "right": similar emails should always get the same labels.
+
+**Priority** (what you need to do, judged as of when the email arrived):
+- **High:** you need to act or respond.
+- **Medium:** worth reading.
+- **Low:** fine to ignore.
+
+**Type** (one per email; pick by what it's about, the sender breaks ties):
+
+| Type | Covers |
+|---|---|
+| career | jobs, internships, recruiters, career center, career fairs, research position postings |
+| school: classes | one specific course: its professor, TAs, Canvas, Gradescope, classmates about the class |
+| school: admin | the university running your enrollment: registration and drop deadlines, advising, billing, financial aid, housing office |
+| housing / landlord | off-campus landlord or property manager |
+| money | banks, bills, receipts, subscriptions, Venmo |
+| security / account | password resets, sign-in alerts, 2FA |
+| clubs / events | student orgs and campus events, including their Slack / Discord |
+| personal | real people you know, not about school or work |
+| social / notifications | automatic alerts where the app itself is the subject: Todoist digests, LinkedIn, Discord, Instagram |
+| newsletter / promo | marketing and digests |
+| other | none of the above; if it keeps filling with one kind of email, add a type |
+
+**Tie-breaks:**
+- Forwarded emails are about what's forwarded (a job posting forwarded by advising is career).
+- App alerts go by their subject: security alerts are security / account, payments are money, Gradescope is school: classes, a club's Slack is clubs / events (by the workspace's purpose).
+- A job shared through a club is career; club dues are money.
+- Promos are low, except from places you actually use, which are medium.
+- A whole group that isn't relevant to you (e.g. a club not aimed at you) is low but keeps its type. Add a sender rule if it's frequent; label an exception by what it is.
+- Same sender and same kind of email: same labels every time.
+- Skip test emails you sent yourself and anything you truly can't decide. Don't skip borderline emails that a rule covers.
+
+**Adding types:** keep about 8–15. Senders (GitHub, Gradescope) aren't types; the model already sees the sender. Add a type only when "other" keeps filling with one kind of email or you keep hesitating between two types for the same reason (e.g. `dev / projects`, `research / lab`, `spam / scam`). Split a type only once it has about 100 examples.
 
 ### Speed log
 

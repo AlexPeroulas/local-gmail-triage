@@ -363,6 +363,29 @@ def set_label():
     return jsonify(ok=True, split=split_for(key))
 
 
+@app.post("/labels/edit")
+def edit_label():
+    # body: {"key", "label": "high" | "medium" | "low", "type"} or {"key", "delete": true}; works for made-up emails too
+    data = request.get_json(silent=True)
+    data = data if isinstance(data, dict) else {}
+    key = data.get("key")
+    with learn_lock:
+        labels = load_labels()
+        if key not in labels:
+            abort(404)
+        if data.get("delete"):
+            del labels[key]   # a real email goes back to the Review queue
+        else:
+            type_ = data.get("type") or ""
+            if data.get("label") not in LEVELS:
+                return bad_request("Pick High, Medium or Low.")
+            if type_ and type_ not in load_config(required=False).get("types", DEFAULT_TYPES):
+                return bad_request("Unknown type.")
+            labels[key].update(label=data["label"], type=type_, at=datetime.now().isoformat(timespec="seconds"))
+        save_labels(labels)
+    return jsonify(ok=True)
+
+
 gmail_lock = threading.Lock()   # the Gmail client isn't thread-safe
 services = {}                   # account -> Gmail service, reused between review fetches
 

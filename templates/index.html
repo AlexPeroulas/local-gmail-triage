@@ -535,15 +535,21 @@
           {% if real_labels %}<p class="hint">The model agreed with you on {{ (100 * agree / real_labels)|round|int }}% of {{ real_labels }} labels from your emails.</p>{% endif %}
           {% if labelled %}
           <details class="all-labels">
-            <summary>All labelled emails ({{ labelled|length }}, as of page load)</summary>
+            <summary>All labelled emails ({{ labelled|length }}, as of page load; changes save right away)</summary>
             <table class="card stats">
-              <thead><tr><th>Sender</th><th>Subject</th><th>Type</th><th>You</th><th>Model</th><th>Set</th></tr></thead>
+              <thead><tr><th>Sender</th><th>Subject</th><th>Type</th><th>You</th><th>Model</th><th>Set</th><th></th></tr></thead>
               <tbody>
                 {% for l in labelled %}
-                <tr><td>{{ l.sender }}</td>
+                <tr data-key="{{ l.key }}"><td>{{ l.sender }}</td>
                   <td>{% if l.gmail_url %}<a href="{{ l.gmail_url }}" target="_blank" rel="noopener noreferrer">{{ l.subject or "(no subject)" }}</a>{% else %}{{ l.subject or "(no subject)" }}{% endif %}</td>
-                  <td>{{ l.type or "-" }}</td><td>{{ l.label|capitalize }}{% if l.source == "correction" %} (fix){% endif %}</td>
-                  <td>{{ l.model|capitalize or "-" }}</td><td>{{ l.group }}</td></tr>
+                  <td><select class="lb-type" aria-label="Type"><option value="">-</option>
+                    {% for t in types %}<option {% if t == l.type %}selected{% endif %}>{{ t }}</option>{% endfor %}
+                    {% if l.type and l.type not in types %}<option selected>{{ l.type }}</option>{% endif %}</select></td>
+                  <td><select class="lb-label" aria-label="Your priority">
+                    {% for level in ["high", "medium", "low"] %}<option value="{{ level }}" {% if level == l.label %}selected{% endif %}>{{ level|capitalize }}</option>{% endfor %}
+                    </select>{% if l.source == "correction" %} (fix){% endif %}</td>
+                  <td>{{ l.model|capitalize or "-" }}</td><td>{{ l.group }}</td>
+                  <td><button class="ghost lb-delete">Delete</button> <span class="msg"></span></td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -1186,6 +1192,22 @@
       queue.unshift(item);
       showReview();
     }
+
+    // All labelled emails: change type / priority in place (saved on change), or delete
+    document.querySelector(".all-labels")?.addEventListener("change", async (e) => {
+      const row = e.target.closest("tr[data-key]");
+      if (!row) return;
+      const {ok, data} = await post("/labels/edit", {key: row.dataset.key,
+        label: row.querySelector(".lb-label").value, type: row.querySelector(".lb-type").value});
+      row.querySelector(".msg").textContent = ok ? "Saved" : (data.error || "Could not save.");
+    });
+    document.querySelector(".all-labels")?.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".lb-delete");
+      if (!btn) return;
+      const row = btn.closest("tr");
+      const {ok} = await post("/labels/edit", {key: row.dataset.key, delete: true});
+      if (ok) row.remove(); else row.querySelector(".msg").textContent = "Could not delete.";
+    });
 
     for (const b of rv("levels").children) b.addEventListener("click", () => selectLabel(b.dataset.label));
     rv("confirm").addEventListener("click", () => selectedLabel && giveLabel(selectedLabel));
