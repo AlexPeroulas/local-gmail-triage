@@ -2,6 +2,8 @@
 
 Local-first Gmail triage across several accounts. Reads your inboxes (read-only), ranks each email **high / medium / low** with a local Gemma model via [Ollama](https://ollama.com), and shows the result in a small web app that runs on your own computer. It learns from your corrections.
 
+> **In progress:** I'm building a labelled dataset (the Dataset tab) to train a small local model that sorts emails by type (career, school, housing, money, ...) as well as priority, so the Inbox can be filtered by type.
+
 Email content never leaves your machine: the only network calls are the Gmail API and `localhost:11434`.
 
 ## Why
