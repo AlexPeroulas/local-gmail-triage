@@ -12,21 +12,22 @@ Local email priority tool. Reads Gmail (read-only), classifies each email with a
 - app.py: Flask UI on 127.0.0.1:5000; Host + Origin checks on every request
 - templates/index.html: the UI (Jinja autoescapes email text; JS builds rows with textContent, never innerHTML)
 - render.py: static data/digest.html for scheduled runs
-- config.json: accounts, query, limit, hide_after (days per priority before an email moves to Older; null = never). Git-ignored; see config.example.json
+- config.json: accounts, query, limit, hide_after (days per priority before an email moves to Older; null = never), types (dataset email types; default store.DEFAULT_TYPES). Git-ignored; see config.example.json
 
 ## Data (all in data/, git-ignored)
-- results.json: one entry per classified email (sender, subject, date, priority, reason; no bodies). Written only by triage.py
+- results.json: one entry per classified email (sender, subject, date, priority, reason; no bodies; "collected": true = from Dataset > Collect more, kept out of the Inbox). Written only by triage.py
 - actions.json: done / ignored per "<account>:<id>". Written only by app.py
 - corrections.json: priority fixes; up to 8 are shown to the model as examples (triage.pick_examples). Written only by app.py
-- rules.json: sender address -> priority; skips the model. Written only by app.py
+- rules.json: sender address -> priority (skips the model), and sender address -> instruction note (added to the prompt). Written only by app.py
+- labels.json: confirmed priorities for training ("<account>:<id>" from Review / corrections, split train or test by hash; "synthetic:<hash>" imported made-up emails, always train). Written only by app.py
 - meta.json: last run time, run id, number added, model speed. Written only by triage.py
-- speed.log: per-email model timings (account label only, no email content). Written only by triage.py
+- speed.log: per-email model timings with account label and Gmail message ID (no email content). Written only by triage.py
 - token_<label>.json: Google sign-in tokens
 
 ## Privacy rules
 - Never read, print, open, or copy: credentials.json, anything in data/, triage.log, .env
 - Do not run commands that display those files (cat, type, Get-Content, etc.)
-- For UI work and tests, generate made-up emails in a temporary folder and point store / gmail_client at it; never use data/
+- For UI work and tests, generate made-up emails in a temporary folder and point store / gmail_client at it; never use data/. Redirect every store path under DATA (loop over them), so new data files can't slip through
 - Never send email content to external services or APIs
 - Never add network calls other than the Gmail API (in gmail_client.py) and localhost:11434 (Ollama)
 - Never commit secrets; keep them listed in .gitignore

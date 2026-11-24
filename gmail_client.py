@@ -105,29 +105,32 @@ def get_text(payload):
     # plain text if the email has it, otherwise the HTML part with tags stripped
     return get_body(payload) or html_to_text(get_body(payload, "text/html"))
 
-def get_recent_emails(svc, query, limit):
+def get_recent_emails(svc, query, limit, skip=frozenset()):
+    # newest matching emails not in skip, up to limit. Listing IDs is cheap, so page past
+    # already-classified ones; only the new ones are downloaded.
+    ids, page = [], None
+    for _ in range(10):   # shortcut: stops after 5000 matches, enough unless the search spans years
+        result = svc.users().messages().list(userId="me", q=query, maxResults=500, pageToken=page).execute()
+        ids += [m["id"] for m in result.get("messages", []) if m["id"] not in skip]
+        page = result.get("nextPageToken")
+        if len(ids) >= limit or not page:
+            break
 
-    emails = [] 
-    result = svc.users().messages().list(userId = "me", q=query, maxResults = limit).execute()
+    return [get_email(svc, message_id) for message_id in ids[:limit]]
 
-    for m in result.get("messages", []):
-        msg = svc.users().messages().get(
-            userId="me",
-            id=m["id"],
-            format="full",
-        ).execute()
 
-        h = {x["name"]: x["value"] for x in msg["payload"]["headers"]}
-        emails.append({
-            "id": m["id"],
-            "from" : h.get("From", ""),
-            "subject" : h.get("Subject", ""),
-            "date" : h.get("Date", ""),
-            "snippet" : msg.get("snippet", ""),
-            "body": get_text(msg["payload"])[:1000],
-        }) 
-
-    return emails
+def get_email(svc, message_id):
+    # one email, in the shape the model sees it (body cut to 1,000 characters)
+    msg = svc.users().messages().get(userId="me", id=message_id, format="full").execute()
+    h = {x["name"]: x["value"] for x in msg["payload"]["headers"]}
+    return {
+        "id": message_id,
+        "from": h.get("From", ""),
+        "subject": h.get("Subject", ""),
+        "date": h.get("Date", ""),
+        "snippet": msg.get("snippet", ""),
+        "body": get_text(msg["payload"])[:1000],
+    }
 
 
     

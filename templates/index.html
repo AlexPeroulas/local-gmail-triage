@@ -162,7 +162,7 @@
 
     /* mail rows: sender + tags | subject + reason | time over account (or the actions on hover).
        The end column is a fixed 132px, so the four 30px actions never cover the text. */
-    .mail { grid-template-columns: 220px minmax(0, 1fr) 132px; grid-template-areas: "who main end";
+    .mail { grid-template-columns: 220px minmax(0, 1fr) 140px; grid-template-areas: "who main end";
             gap: 24px; align-items: start; }
     .mail:hover, .mail:focus-within { background: var(--hover); }
     .c-who { grid-area: who; min-width: 0; display: flex; align-items: center; gap: 6px; }
@@ -180,9 +180,9 @@
     .cols { display: none; }
 
     /* wide windows: one line per email, like a table.
-       184 sender | 1fr subject | 1fr why | 156 account + time (also fits the four 30px hover actions) */
+       184 sender | 1fr subject | 1fr why | 200 account + time with clock (also fits the four 30px hover actions) */
     @media (min-width: 1100px) {
-      .mail, .cols { grid-template-columns: 184px minmax(0, 1fr) minmax(0, 1fr) 156px; gap: 24px; }
+      .mail, .cols { grid-template-columns: 184px minmax(0, 1fr) minmax(0, 1fr) 200px; gap: 24px; }
       .mail { grid-template-areas: "who subj why end"; align-items: center; }
       .list .row.mail { padding-top: 9px; padding-bottom: 9px; }
       .c-main { display: contents; }
@@ -200,7 +200,11 @@
     /* "Wrong priority?" panel inside a row */
     .fix { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
            padding-top: 12px; border-top: 1px solid var(--rule); }
-    .fix input { flex: 1; min-width: 180px; }
+    .fix input[type=text] { flex: 1; min-width: 180px; }
+    .fix .remember { display: flex; align-items: center; gap: 6px; flex-basis: 100%; color: var(--muted); font-size: 13px; }
+    /* run progress, under the title */
+    .progress { height: 3px; margin: -24px 0 24px; background: var(--rule); border-radius: 2px; overflow: hidden; }
+    .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
     /* rule suggestion, shown above the list */
     .banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px; margin: 0 0 32px;
               background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); }
@@ -231,6 +235,45 @@
     .field input { width: 100%; max-width: 420px; }
     .field input[type=number] { max-width: 100px; }
     .msg { font-size: 13px; }
+
+    /* search box above the email lists */
+    .searchbar { margin: 0 0 24px; }
+    input[type=search] { height: 32px; width: 100%; max-width: 360px; padding: 0 10px; border: 1px solid var(--border);
+                         border-radius: var(--radius-control); background: var(--surface); }
+
+    /* Dataset tab */
+    .review-mail { padding: 16px; display: grid; gap: 4px; }
+    .review-mail .subject a { color: inherit; }
+    .rv-controls { display: grid; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--rule); }
+    .rv-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .rv-label { width: 64px; flex: none; color: var(--muted); font-size: 13px; }
+    .types { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+    .types button { height: 28px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius-control);
+                    background: var(--surface); color: var(--text); font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+    .types button:hover { background: var(--raised); }
+    .types button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+    .types button[aria-pressed="true"] kbd { background: transparent; color: inherit; }
+    .rv-seen { padding: 12px 16px 16px; border-top: 1px solid var(--rule); display: grid; gap: 8px; }
+    .rv-seen pre { margin: 0; padding: 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+                   background: var(--ground); border: 1px solid var(--rule); border-radius: var(--radius-control);
+                   font: 12px/18px ui-monospace, Consolas, monospace; }
+    .all-labels { margin-top: 12px; }
+    .all-labels summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .all-labels td { text-align: left; }
+    .rv-seen summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+    .rv-seen details pre { margin-top: 8px; }
+    textarea { width: 100%; max-width: 420px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-control);
+               background: var(--surface); font: inherit; resize: vertical; }
+    .review-mail .who { gap: 12px; }
+    .review + .hint, .stats + .hint { margin-top: 8px; }
+    kbd { font: 12px ui-monospace, Consolas, monospace; background: var(--raised); border-radius: 4px; padding: 0 4px; }
+    table.stats { border-collapse: separate; border-spacing: 0; width: 100%; max-width: 560px; font-variant-numeric: tabular-nums; }
+    .stats th, .stats td { padding: 8px 16px; text-align: right; font-weight: 400; }
+    .stats th { color: var(--muted); font-size: 12px; }
+    .stats th:first-child, .stats td:first-child { text-align: left; }
+    .stats tbody td { border-top: 1px solid var(--rule); }
+    .stats .total { font-weight: 600; }
+    pre.hint { margin: 4px 0 0; white-space: pre-wrap; font: 12px/18px ui-monospace, Consolas, monospace; }
 
     #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
              background: var(--accent); color: var(--on-accent); padding: 10px 12px 10px 16px; border-radius: var(--radius-card);
@@ -293,6 +336,9 @@
       <button class="nav-item tab" role="tab" data-tab="ignored" data-title="Ignored">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.2 11.8l7.6-7.6" stroke="currentColor" stroke-width="1.4"/></svg>
         Ignored <span class="n"></span></button>
+      <button class="nav-item tab" role="tab" data-tab="dataset" data-title="Dataset">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Dataset <span class="n"></span></button>
     </nav>
 
     <h2 {% if filter_accounts|length < 2 %}hidden{% endif %}>Accounts</h2>
@@ -301,6 +347,12 @@
       {% for label in filter_accounts %}
         <button class="nav-item" data-account="{{ label }}">{{ label }} <span class="n"></span></button>
       {% endfor %}
+    </div>
+
+    <h2>Show</h2>
+    <div class="accounts" id="show" role="group" aria-label="Show">
+      <button class="nav-item" data-show="all">All emails</button>
+      <button class="nav-item" data-show="new" title="Only emails added by the latest run">New from last run <span class="n"></span></button>
     </div>
 
     <div class="bottom">
@@ -322,6 +374,7 @@
       </div>
       <button id="run" class="primary" {% if state.running %}disabled{% endif %}>Run now</button>
     </div>
+    <div class="progress" id="progress" role="progressbar" aria-label="Run progress" hidden><div></div></div>
 
     <div class="banner" id="suggest" hidden>
       <span></span>
@@ -329,11 +382,15 @@
       <button class="ghost" id="suggest-no">No thanks</button>
     </div>
 
+    <div class="searchbar" id="searchbar">
+      <input type="search" id="search" placeholder="Search sender, subject or reason" aria-label="Search emails" autocomplete="off">
+    </div>
+
     <!-- Inbox -->
     <section class="panel" id="panel-inbox" role="tabpanel">
       <div class="cols" aria-hidden="true"><span>From</span><span>Subject</span><span>Why this priority</span><span><span>Account</span><span>Received</span></span></div>
       {% macro mail_row(r, older=False) %}
-      <li class="row mail email" data-account="{{ r.account }}" data-id="{{ r.id }}" data-model="{{ r.model_priority }}" data-priority="{{ r.priority }}">
+      <li class="row mail email" data-account="{{ r.account }}" data-id="{{ r.id }}"{% if r.new %} data-new{% endif %} data-model="{{ r.model_priority }}" data-priority="{{ r.priority }}">
         <div class="c-who">
           <div class="name" title="{{ r['from'] }}">{{ r.sender }}</div>
           <div class="tags">
@@ -400,6 +457,131 @@
       </section>
     {% endfor %}
 
+    <!-- Dataset: confirmed labels for training a classifier; writes data/labels.json -->
+    <section class="panel" id="panel-dataset" role="tabpanel" hidden>
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Review <span class="hint" id="review-left"></span></h3>
+          <p class="hint">Confirm or fix the model's priority. Each answer becomes a training label. Emails come in random order, so the labels aren't skewed toward the ones you notice.</p>
+          <p class="hint">Pick a type (its letter), then a priority: <kbd>1</kbd> High <kbd>2</kbd> Medium <kbd>3</kbd> Low (starts on the model's pick), then <kbd>Enter</kbd> confirm. <kbd>S</kbd> skip, <kbd>U</kbd> undo.</p>
+        </div>
+        <div>
+          <div class="card review" id="review">
+            <div class="review-mail" id="rv-mail">
+              <div class="who"><span class="name" id="rv-sender"></span><span class="hint" id="rv-meta"></span></div>
+              <div class="subject"><a id="rv-subject" target="_blank" rel="noopener noreferrer" title="Open in Gmail"></a></div>
+              <div class="reason" id="rv-model"></div>
+            </div>
+            <div class="rv-controls" id="rv-controls">
+              <div class="rv-row"><span class="rv-label">Type</span><div class="types" id="rv-types"></div></div>
+              <div class="rv-row"><span class="rv-label">Priority</span>
+                <div class="segmented" id="rv-levels">
+                  <button data-label="high">High <kbd>1</kbd></button><button data-label="medium">Medium <kbd>2</kbd></button><button data-label="low">Low <kbd>3</kbd></button>
+                </div>
+                <button class="primary" id="rv-confirm">Confirm <kbd>Enter</kbd></button>
+                <button class="ghost" id="rv-skip">Skip</button>
+                <button class="ghost" id="rv-undo" disabled>Undo</button>
+                <span class="msg" id="rv-msg"></span>
+              </div>
+            </div>
+            <div class="rv-seen" id="rv-seen">
+              <span class="rv-label" style="width:auto">What the model sees (loaded from Gmail, not stored)</span>
+              <pre id="rv-email"></pre>
+              <details><summary>Full prompt: instructions, your correction examples and sender instruction, as of now</summary><pre id="rv-prompt"></pre></details>
+            </div>
+            <p class="empty" id="rv-empty" style="padding: 16px" hidden>Nothing left to review. For more: widen the range and raise the limit in Settings, then Run now.</p>
+          </div>
+          <p class="hint">Judge each email as of when it arrived: a deadline that has passed was still urgent then.</p>
+        </div>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Collect more</h3>
+          <p class="hint">Fetches and classifies up to this many not-yet-classified emails per account (about 1 s each). They show up in Review, not in the Inbox. Progress shows at the top.</p>
+        </div>
+        <form class="card" id="collect">
+          <div class="field"><span class="label">Range</span>
+            <div class="segmented" id="collect-range">
+              <button type="button" data-range="1m">1 month</button><button type="button" data-range="3m">3 months</button>
+              <button type="button" data-range="6m">6 months</button><button type="button" data-range="12m">1 year</button>
+            </div>
+          </div>
+          <div class="field"><label for="collect-query">Gmail search</label>
+            <input type="text" id="collect-query" value="in:inbox newer_than:6m" maxlength="200" required></div>
+          <div class="field"><label for="collect-n">Emails per account</label>
+            <input type="number" id="collect-n" value="100" min="1" max="500" required></div>
+          <div class="form"><button class="ghost">Collect</button><span class="msg" id="collect-msg"></span></div>
+        </form>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Labels</h3>
+          <p class="hint">Saved to data/labels.json. Test is a fixed ~20% of your real emails: never train on it. Made-up emails only go to training. Priority fixes from the Inbox count too.</p>
+        </div>
+        <div>
+          <table class="card stats">
+            <thead><tr><th></th><th>High</th><th>Medium</th><th>Low</th><th>Total</th></tr></thead>
+            <tbody>
+              {% for group, title in [("train", "Train (your emails)"), ("test", "Test (your emails)"), ("synthetic", "Made-up (train only)")] %}
+                <tr data-group="{{ group }}"><td>{{ title }}</td>
+                  {% for level in ["high", "medium", "low"] %}<td data-level="{{ level }}">{{ dataset[group][level] }}</td>{% endfor %}
+                  <td class="total">{{ dataset[group].values()|sum }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="hint">Types: {% for t, n in type_counts.items() %}{{ t }} <b>{{ n }}</b>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+          {% if real_labels %}<p class="hint">The model agreed with you on {{ (100 * agree / real_labels)|round|int }}% of {{ real_labels }} labels from your emails.</p>{% endif %}
+          {% if labelled %}
+          <details class="all-labels">
+            <summary>All labelled emails ({{ labelled|length }}, as of page load)</summary>
+            <table class="card stats">
+              <thead><tr><th>Sender</th><th>Subject</th><th>Type</th><th>You</th><th>Model</th><th>Set</th></tr></thead>
+              <tbody>
+                {% for l in labelled %}
+                <tr><td>{{ l.sender }}</td>
+                  <td>{% if l.gmail_url %}<a href="{{ l.gmail_url }}" target="_blank" rel="noopener noreferrer">{{ l.subject or "(no subject)" }}</a>{% else %}{{ l.subject or "(no subject)" }}{% endif %}</td>
+                  <td>{{ l.type or "-" }}</td><td>{{ l.label|capitalize }}{% if l.source == "correction" %} (fix){% endif %}</td>
+                  <td>{{ l.model|capitalize or "-" }}</td><td>{{ l.group }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </details>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Types</h3>
+          <p class="hint">One per line. Use "group: detail" (e.g. "internship: interview / assessment") so rare details can be merged into their group later. Renaming a type doesn't change labels already saved.</p>
+        </div>
+        <form class="card" id="types-form">
+          <div class="field"><textarea id="types-text" rows="{{ types|length + 1 }}">{{ types|join("\n") }}</textarea></div>
+          <div class="form"><button class="ghost">Save types</button><span class="msg" id="types-msg"></span></div>
+        </form>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">
+          <h3 class="section">Import made-up emails</h3>
+          <p class="hint">Add generated emails for types your inbox doesn't have yet. They're labelled by you, stored with their body, and never used for testing. Importing the same file twice adds nothing.</p>
+        </div>
+        <form class="card" id="import">
+          <div class="field">
+            <label for="import-file">JSON file</label>
+            <input type="file" id="import-file" accept=".json,application/json" required>
+            <pre class="hint">{"emails": [{"from": "Recruiter &lt;jobs@acme.com&gt;", "subject": "Interview next week",
+             "body": "...", "label": "high", "type": "internship"}]}</pre>
+          </div>
+          <div class="form"><button class="ghost">Import</button><span class="msg" id="import-msg"></span></div>
+        </form>
+      </div>
+      <script type="application/json" id="review-data">{{ review|tojson }}</script>
+      <script type="application/json" id="types-data">{{ types|tojson }}</script>
+    </section>
+
     <!-- Settings: writes config.json -->
     <section class="panel" id="panel-settings" role="tabpanel" hidden>
       <div class="setting">
@@ -458,6 +640,24 @@
 
       <div class="setting">
         <div class="setting-label">
+          <h3 class="section">Sender instructions</h3>
+          <p class="hint">Notes the model sees for every email from that sender, e.g. "High only if it's about an interview". Add one from an email's priority button.</p>
+        </div>
+        <ul class="card" id="notes">
+          {% for sender, note in notes.items() %}
+            <li class="row" data-sender="{{ sender }}">
+              <div><div class="who"><span class="name">{{ sender }}</span></div>
+                   <div class="reason">{{ note }}</div></div>
+              <div class="actions"><button class="ghost danger" data-do="remove-note">Remove</button></div>
+            </li>
+          {% else %}
+            <li class="form hint">No instructions yet. When you fix a priority, write a note and tick "Use this note for every email from this sender".</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="setting">
+        <div class="setting-label">
           <h3 class="section">Corrections <span class="hint">{{ correction_count }}</span></h3>
           <p class="hint">Priorities you fixed. The most relevant ones are shown to the model as examples on each run.</p>
         </div>
@@ -492,8 +692,8 @@
       <div class="setting">
         <div class="setting-label">
           <h3 class="section">What to fetch</h3>
-          <p class="hint">Each run asks Gmail for the newest emails matching the search, up to the limit per account.
-            Emails classified before are skipped, so only new ones go to the model. Nothing in Gmail is changed.</p>
+          <p class="hint">Each run finds emails matching the search that haven't been classified yet, newest first,
+            and classifies up to the limit per account. Widen the range to catch up on older mail; the next run picks up where this one stopped. Nothing in Gmail is changed.</p>
         </div>
         <form class="card" id="fetch-settings">
           <div class="field">
@@ -518,8 +718,8 @@
           </div>
           <div class="field">
             <label for="limit">Emails per account</label>
-            <input type="number" id="limit" name="limit" value="{{ config.limit }}" min="1" max="100" required>
-            <span class="hint">The newest 1-100 matching emails per account, per run. If more new emails than this arrive between runs, the older ones are missed: raise it or run more often.</span>
+            <input type="number" id="limit" name="limit" value="{{ config.limit }}" min="1" max="500" required>
+            <span class="hint">Up to 1-500 new (not yet classified) emails per account, per run. If there are more, the next run continues with the rest.</span>
           </div>
           <div class="form"><button class="ghost">Save</button><span class="msg" id="settings-msg"></span></div>
         </form>
@@ -570,6 +770,7 @@
       }
       for (const panel of document.querySelectorAll(".panel")) panel.hidden = panel.id !== `panel-${name}`;
       document.getElementById("run").hidden = name === "settings";   // Settings has its own job
+      document.getElementById("searchbar").hidden = name === "settings" || name === "dataset";
       history.replaceState(null, "", name === "inbox" ? location.pathname : `#${name}`);
       updateCounts();
     }
@@ -580,13 +781,30 @@
     let account = localStorage.getItem("account") || "all";
     if (![...filterButtons].some(b => b.dataset.account === account)) account = "all";
 
+    // search box: matches anything in the row (sender, subject, reason, account)
+    const search = document.getElementById("search");
+    search.addEventListener("input", () => applyFilter());
+
+    // "New from last run" only narrows the Inbox; Completed / Ignored always show everything
+    const showButtons = document.querySelectorAll("#show button");
+    let show = localStorage.getItem("show") === "new" ? "new" : "all";
+
     function applyFilter() {
       for (const b of filterButtons) b.setAttribute("aria-pressed", b.dataset.account === account);
+      for (const b of showButtons) b.setAttribute("aria-pressed", b.dataset.show === show);
       for (const row of document.querySelectorAll(".panel .mail")) {
-        row.hidden = account !== "all" && row.dataset.account !== account;
+        row.hidden = (account !== "all" && row.dataset.account !== account)
+                  || (search.value.trim() && !row.textContent.toLowerCase().includes(search.value.trim().toLowerCase()))
+                  || (show === "new" && row.matches(".email") && !row.hasAttribute("data-new"));
       }
       updateCounts();
     }
+    for (const b of showButtons) b.addEventListener("click", () => {
+      show = b.dataset.show;
+      localStorage.setItem("show", show);
+      if (currentTab !== "inbox") showTab("inbox");
+      applyFilter();
+    });
     for (const b of filterButtons) b.addEventListener("click", () => {
       account = b.dataset.account;
       localStorage.setItem("account", account);
@@ -605,7 +823,11 @@
       }
       // Older emails are past their cutoff, so they do not count as needing you
       const inbox = document.querySelectorAll("#panel-inbox .group:not(.older) .email:not([hidden])").length;
-      document.getElementById("inbox-empty").hidden = inbox > 0;
+      const empty = document.getElementById("inbox-empty");
+      empty.hidden = inbox > 0;
+      empty.textContent = search.value.trim() ? "No emails match your search."
+                        : show === "new" ? "No new emails from the last run. Choose All emails to see the rest."
+                                         : "Nothing needs you. Run now checks for new emails.";
 
       const counts = {inbox};
       for (const status of ["done", "ignored"]) {
@@ -627,10 +849,15 @@
                 : rows.filter(r => r.dataset.account === b.dataset.account).length;
         b.querySelector(".n").textContent = n || "";
       }
+      // new emails still in the inbox, for the account you're looking at
+      document.querySelector('#show [data-show="new"] .n').textContent =
+        [...document.querySelectorAll("#panel-inbox .email[data-new]")]
+          .filter(r => account === "all" || r.dataset.account === account).length || "";
 
       document.getElementById("summary").textContent =
         currentTab === "inbox" ? parts.join(" · ")
         : currentTab === "settings" ? "Saved to config.json"
+        : currentTab === "dataset" ? "Training labels, saved to data/labels.json"
         : `${counts[currentTab]} email${counts[currentTab] === 1 ? "" : "s"}`;
     }
 
@@ -647,6 +874,14 @@
       const s = await (await fetch("/status")).json();
       if (s.running) {
         statusEl.textContent = s.message;
+        const bar = document.getElementById("progress");
+        bar.hidden = !s.step;
+        if (s.step) {
+          const [done, total] = s.step;
+          bar.firstElementChild.style.width = `${total ? 100 * done / total : 0}%`;
+          bar.setAttribute("aria-valuenow", done);
+          bar.setAttribute("aria-valuemax", total);
+        }
         setTimeout(poll, 2000);
       } else if (s.error) {
         showError(s.error);
@@ -774,6 +1009,11 @@
       note.type = "text";
       note.maxLength = 200;
       note.placeholder = "Why? (optional, helps the model next time)";
+      const remember = document.createElement("label");
+      remember.className = "remember";
+      const rememberBox = document.createElement("input");
+      rememberBox.type = "checkbox";
+      remember.append(rememberBox, "Use this note for every email from this sender");
       const save = document.createElement("button");
       save.className = "ghost";
       save.textContent = "Save";
@@ -783,9 +1023,10 @@
       cancel.addEventListener("click", () => panel.remove());
 
       save.addEventListener("click", async () => {
-        if (choice === current) return panel.remove();
+        const keep = rememberBox.checked && note.value.trim();
+        if (choice === current && !keep) return panel.remove();
         const {ok, data} = await post("/correct", {
-          account: row.dataset.account, id: row.dataset.id, priority: choice, note: note.value,
+          account: row.dataset.account, id: row.dataset.id, priority: choice, note: note.value, remember: !!keep,
         });
         if (!ok) return showError("Could not save the correction.");
         if (data.suggest) sessionStorage.setItem("suggest", JSON.stringify(data.suggest));   // shown after reload
@@ -793,7 +1034,7 @@
       });
       note.addEventListener("keydown", (e) => { if (e.key === "Enter") save.click(); });
 
-      panel.append(label, levels, note, save, cancel);
+      panel.append(label, levels, note, save, cancel, remember);
       row.append(panel);
       note.focus();
     }
@@ -825,11 +1066,196 @@
       await post("/rules", {sender: btn.closest(".row").dataset.sender, priority: null});
       location.reload();
     });
+    document.getElementById("notes").addEventListener("click", async (event) => {
+      const btn = event.target.closest("button[data-do=remove-note]");
+      if (!btn) return;
+      await post("/notes/remove", {sender: btn.closest(".row").dataset.sender});
+      location.reload();
+    });
     document.getElementById("corrections").addEventListener("click", async (event) => {
       const btn = event.target.closest("button[data-do=remove-correction]");
       if (!btn) return;
       await post("/corrections/remove", {key: btn.closest(".row").dataset.key});
       location.reload();
+    });
+
+    // ---- Dataset: review queue (keyboard first) and import ----
+    const queue = JSON.parse(document.getElementById("review-data").textContent);
+    for (let i = queue.length - 1; i > 0; i--) {   // random order, so labels aren't skewed toward what you notice
+      const j = Math.floor(Math.random() * (i + 1));
+      [queue[i], queue[j]] = [queue[j], queue[i]];
+    }
+    const labelled = [];   // for Undo: [item, split, label]
+    const types = JSON.parse(document.getElementById("types-data").textContent);
+    const TYPE_KEYS = "qwertyiopadfghjklzxcvbm";   // letters left after S (skip), U (undo), N
+    let selectedType = "", selectedLabel = "";
+    const rv = (id) => document.getElementById(`rv-${id}`);
+    const cap = (w) => w[0].toUpperCase() + w.slice(1);
+
+    function bump(split, label, by) {
+      const row = document.querySelector(`.stats tr[data-group="${split}"]`);
+      for (const cell of [row.querySelector(`[data-level="${label}"]`), row.querySelector(".total")])
+        cell.textContent = Number(cell.textContent) + by;
+    }
+
+    function showReview() {
+      const item = queue[0];
+      document.getElementById("review-left").textContent = queue.length ? `${queue.length} left` : "";
+      document.querySelector('.tab[data-tab="dataset"] .n').textContent = queue.length || "";
+      rv("mail").hidden = rv("seen").hidden = !item;
+      rv("empty").hidden = !!item;
+      rv("controls").hidden = !item && !labelled.length;   // keep Undo reachable after the last one
+      rv("undo").disabled = !labelled.length;
+      for (const b of [...rv("levels").children, ...rv("types").children, rv("confirm"), rv("skip")]) b.disabled = !item;
+      if (!item) return;
+      rv("sender").textContent = item.sender;
+      rv("sender").title = item.from;
+      rv("meta").textContent = `${item.account} · ${item.time}`;
+      rv("subject").textContent = item.subject || "(no subject)";
+      if (item.gmail_url) rv("subject").href = item.gmail_url; else rv("subject").removeAttribute("href");
+      rv("model").textContent = `Model: ${cap(item.model)} · ${item.reason}`;
+      selectLabel(item.model);   // starts on the model's pick; Confirm saves it
+      selectType("");
+      showSeen(item);
+      if (queue[1]) fetchSeen(queue[1]);   // load the next one in the background
+    }
+
+    // type buttons, one letter key each
+    types.forEach((t, i) => {
+      const b = document.createElement("button");
+      b.dataset.type = t;
+      const k = document.createElement("kbd");
+      k.textContent = TYPE_KEYS[i] ?? "";
+      b.append(t, k);
+      b.addEventListener("click", () => selectType(selectedType === t ? "" : t));
+      rv("types").append(b);
+    });
+    function selectLabel(l) {
+      selectedLabel = l;
+      for (const b of rv("levels").children) b.setAttribute("aria-pressed", b.dataset.label === l);
+    }
+    function selectType(t) {
+      selectedType = t;
+      for (const b of rv("types").children) b.setAttribute("aria-pressed", b.dataset.type === t);
+    }
+
+    // what the model sees: fetched live from Gmail, cached for this page only
+    const seen = new Map();
+    function fetchSeen(item) {
+      const key = `${item.account}:${item.id}`;
+      if (!seen.has(key)) {
+        const url = `/review/email?account=${encodeURIComponent(item.account)}&id=${encodeURIComponent(item.id)}`;
+        seen.set(key, fetch(url).then(async (res) => ({ok: res.ok, ...(await res.json().catch(() => ({})))}))
+                                .catch(() => ({ok: false, error: "Could not reach app.py."})));
+      }
+      return seen.get(key);
+    }
+    async function showSeen(item) {
+      rv("email").textContent = "Loading from Gmail...";
+      rv("prompt").textContent = "";
+      const data = await fetchSeen(item);
+      if (queue[0] !== item) return;   // moved on while it loaded
+      if (!data.ok) {
+        seen.delete(`${item.account}:${item.id}`);   // try again next time
+        rv("email").textContent = data.error || "Could not load this email.";
+        return;
+      }
+      const e = data.email;
+      rv("email").textContent = `From: ${e.from}\nSubject: ${e.subject}\nPreview: ${e.snippet}\nBody: ${e.body}`;
+      rv("prompt").textContent = data.prompt;
+    }
+
+    async function giveLabel(label) {
+      const item = queue[0];
+      if (!item) return;
+      const {ok, data} = await post("/labels", {account: item.account, id: item.id, label, type: selectedType});
+      if (!ok) { rv("msg").textContent = "Could not save. Is app.py running?"; return; }
+      rv("msg").textContent = "";
+      labelled.push([queue.shift(), data.split, label]);
+      bump(data.split, label, 1);
+      showReview();
+    }
+
+    async function undoLabel() {
+      const last = labelled.pop();
+      if (!last) return;
+      const [item, split, label] = last;
+      const {ok} = await post("/labels", {account: item.account, id: item.id, label: null});
+      if (!ok) { labelled.push(last); rv("msg").textContent = "Could not undo."; return; }
+      bump(split, label, -1);
+      queue.unshift(item);
+      showReview();
+    }
+
+    for (const b of rv("levels").children) b.addEventListener("click", () => selectLabel(b.dataset.label));
+    rv("confirm").addEventListener("click", () => selectedLabel && giveLabel(selectedLabel));
+    rv("skip").addEventListener("click", () => { if (queue.length) { queue.push(queue.shift()); showReview(); } });
+    rv("undo").addEventListener("click", undoLabel);
+    document.addEventListener("keydown", (e) => {
+      if (currentTab !== "dataset" || e.ctrlKey || e.metaKey || e.altKey || e.target.closest("input, textarea, select") ||
+          (e.target.closest("button") && !e.target.closest("#rv-controls"))) return;
+      const key = e.key.toLowerCase();
+      const levels = {"1": "high", "2": "medium", "3": "low"};
+      if (levels[key]) selectLabel(levels[key]);
+      else if (TYPE_KEYS.includes(key) && types[TYPE_KEYS.indexOf(key)]) {
+        const t = types[TYPE_KEYS.indexOf(key)];
+        selectType(selectedType === t ? "" : t);
+      }
+      else if (key === "enter") rv("confirm").click();
+      else if (key === "s") rv("skip").click();
+      else if (key === "u") undoLabel();
+      else return;
+      e.preventDefault();
+    });
+    showReview();
+
+    // Collect more: a run with its own search and size; progress shows in the title like Run now
+    const collectQuery = document.getElementById("collect-query");
+    const markCollectRange = () => {
+      const m = collectQuery.value.match(/newer_than:(\w+)/);
+      for (const b of document.querySelectorAll("#collect-range button"))
+        b.setAttribute("aria-pressed", !!m && b.dataset.range === m[1]);
+    };
+    for (const b of document.querySelectorAll("#collect-range button")) b.addEventListener("click", () => {
+      const q = collectQuery.value;
+      collectQuery.value = /newer_than:\w+/.test(q) ? q.replace(/newer_than:\w+/, `newer_than:${b.dataset.range}`)
+                                                    : `${q} newer_than:${b.dataset.range}`.trim();
+      markCollectRange();
+    });
+    collectQuery.addEventListener("input", markCollectRange);
+    markCollectRange();
+    document.getElementById("collect").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const msg = document.getElementById("collect-msg");
+      const {ok, data} = await post("/run", {query: collectQuery.value, limit: document.getElementById("collect-n").value});
+      if (!ok) { msg.textContent = data.error || (data.running ? "A run is already going." : "Could not start."); return; }
+      msg.textContent = "Collecting... progress is at the top. The page reloads when it's done.";
+      button.disabled = true;
+      statusEl.className = "";
+      poll();
+    });
+
+    document.getElementById("types-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const list = document.getElementById("types-text").value.split("\n").map(t => t.trim()).filter(Boolean);
+      const {ok, data} = await post("/settings", {types: list});
+      document.getElementById("types-msg").textContent = ok ? "Saved. Reloading..." : (data.error || "Could not save.");
+      if (ok) setTimeout(() => location.reload(), 800);
+    });
+
+    document.getElementById("import").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const msg = document.getElementById("import-msg");
+      const file = document.getElementById("import-file").files[0];
+      let body;
+      try {
+        body = JSON.parse(await file.text());
+        if (Array.isArray(body)) body = {emails: body};   // a bare list works too
+      } catch { msg.textContent = "That file isn't valid JSON."; return; }
+      const {ok, data} = await post("/labels/import", body);
+      if (!ok) { msg.textContent = data.error || "Import failed."; return; }
+      msg.textContent = `Added ${data.added}` + (data.skipped ? ` (${data.skipped} already imported)` : "") + ". Reloading...";
+      setTimeout(() => location.reload(), 1200);
     });
 
     // ---- Settings ----

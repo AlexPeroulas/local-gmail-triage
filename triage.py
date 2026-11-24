@@ -1,7 +1,7 @@
 import requests
 import json
 from gmail_client import get_service, get_recent_emails, NotSignedIn
-from store import (load_results, save_results, load_config, save_meta,
+from store import (load_results, save_results, load_config, save_meta, load_meta,
                    load_corrections, load_rules, sender_address)
 from datetime import datetime
 from render import write_html
@@ -55,9 +55,15 @@ def warm_up():
         pass   # Ollama not running: Run now reports that itself
 
 
-def classify(email, examples=()):
+def build_prompt(email, examples=(), sender_note=""):
+    # the exact text the model gets for one email (also shown in the Dataset tab)
     email_text = f"From: {email['from']}\nSubject: {email['subject']}\nPreview: {email['snippet']}\nBody: {email['body']}"
-    prompt = prompt_instructions + examples_text(examples) + "\nEmail: " + email_text
+    note = f"\n\nThe user's instruction for emails from this sender: {sender_note}" if sender_note else ""
+    return prompt_instructions + examples_text(examples) + note + "\nEmail: " + email_text
+
+
+def classify(email, examples=(), sender_note=""):
+    prompt = build_prompt(email, examples, sender_note)
 
     payload = {
         "model": MODEL,
@@ -81,7 +87,7 @@ def classify(email, examples=()):
 
 
 def log_speed(line):
-    # timings only (account label, no email content), so the file is safe to open
+    # timings, account label and Gmail message ID only (no email content), so the file is safe to open
     line = f"{datetime.now():%Y-%m-%d %H:%M:%S}  {line}"
     print(line)
     store.DATA.mkdir(exist_ok=True)
@@ -113,13 +119,16 @@ def get_services(accounts, allow_login):
     return services
 
 
-def run_triage(allow_login=True, open_page=True, on_progress=None):
-    def progress(message):
+def run_triage(allow_login=True, open_page=True, on_progress=None, query=None, limit=None):
+    # query / limit given: a "collect" run for the dataset. Its emails stay out of the Inbox
+    # and it doesn't change which emails count as New.
+    collect = query is not None
+    def progress(message, step=None):   # step: (done, total) while classifying
         if on_progress:
-            on_progress(message)
+            on_progress(message, step)
 
     config = load_config()
-    query, limit = config["query"], config["limit"]
+    query, limit = query or config["query"], limit or config["limit"]
     progress("Checking sign-ins...")
     services = get_services(config["accounts"], allow_login)
 
@@ -130,32 +139,36 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
 
     seen = {(r["account"], r["id"]) for r in results}
     corrections = load_corrections()
-    rules = load_rules()["rules"]
+    learned = load_rules()
+    rules, notes = learned["rules"], learned["notes"]
     added = 0
     timings = []   # Ollama stats per model call
     run_id = datetime.now().isoformat(timespec="seconds")   # tags every email added by this run
 
+    # fetch every account first, so the progress bar knows the total
+    batches = []
     for account, svc in services.items():
-        progress(f"Fetching up to {limit} emails from {account}...")
-        emails = get_recent_emails(svc, query, limit)
-        new = [e for e in emails if (account, e["id"]) not in seen]
-        skipped = len(emails) - len(new)
+        progress(f"Looking for up to {limit} new emails in {account}...")
+        done_ids = {i for a, i in seen if a == account}
+        batches.append((account, get_recent_emails(svc, query, limit, skip=done_ids)))
+    total = sum(len(new) for _, new in batches)
 
+    for account, new in batches:
         for i, e in enumerate(new, 1):
-            progress(f"{account}: classifying {i} of {len(new)}"
-                     + (f" ({skipped} already done)" if skipped else ""))
+            progress(f"Classifying {added + 1} of {total} new ({account})", (added, total))
             sender = sender_address(e["from"])
             if sender in rules:   # your rule decides; no need to ask the model
                 priority, reason = rules[sender], f"Sender rule: always {rules[sender]}"
             else:
-                priority, reason, s = classify(e, pick_examples(corrections, sender))
+                priority, reason, s = classify(e, pick_examples(corrections, sender), notes.get(sender, ""))
                 timings.append(s)
-                log_speed(f"{account} {i}/{len(new)}: {s['seconds']:.1f}s "
+                log_speed(f"{account} {i}/{len(new)} [{e['id']}]: {s['seconds']:.1f}s "
                           f"(load {s['load']:.1f}s), {s['tokens']} tokens, {s['tok_s']:.1f} tok/s")
             results.append({
                 "id": e["id"], "account": account, "from": e["from"],
                 "subject": e["subject"], "date": e["date"],
                 "priority": priority.lower(), "reason": reason, "run": run_id,
+                **({"collected": True} if collect else {}),
             })
             added += 1
             save_results(results)
@@ -168,8 +181,11 @@ def run_triage(allow_login=True, open_page=True, on_progress=None):
         speed = (f"{total / len(timings):.1f}s per email, "
                  f"{sum(t['tok_s'] for t in timings) / len(timings):.0f} tok/s")
         log_speed(f"Run {run_id} done: {len(timings)} emails, {total:.0f}s total, {speed}")
-    save_meta({"last_run": datetime.now().isoformat(timespec="seconds"), "run": run_id,
-               "added": added, "speed": speed})
+    meta = load_meta()
+    if not collect:   # collect runs don't change what counts as New
+        meta.update(run=run_id, added=added)
+    meta.update(last_run=datetime.now().isoformat(timespec="seconds"), speed=speed)
+    save_meta(meta)
     progress(f"Finished: {added} new emails")
 
 if __name__ == "__main__":

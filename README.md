@@ -10,10 +10,10 @@ Juggling several inboxes (work, personal, school) makes it easy to miss the few 
 
 ## How it works
 
-1. `gmail_client.py` signs in to each account (OAuth, `gmail.readonly` scope) and fetches recent emails.
+1. `gmail_client.py` signs in to each account (OAuth, `gmail.readonly` scope) and fetches recent emails. The model sees the sender, subject, Gmail's preview and the first 1,000 characters of the body (the plain-text part, or the HTML part with tags stripped if there is no plain text).
 2. `triage.py` classifies each new email with the local model and gets back a priority and a one-line reason.
    - Senders with a **rule** skip the model.
-   - Otherwise the prompt includes up to 8 of your past **corrections** as examples (same sender first, then same domain, then newest).
+   - Otherwise the prompt includes up to 8 of your past **corrections** as examples (same sender first, then same domain, then newest), plus your **sender instruction** if that sender has one.
 3. `store.py` saves everything as JSON in `data/`, so emails are never classified twice.
 4. `app.py` is a Flask app on `127.0.0.1:5000` that shows the results (`templates/index.html`), runs triage in the background, and saves your actions.
 5. `render.py` also writes a static `data/digest.html` for scheduled runs.
@@ -128,7 +128,7 @@ cp config.example.json config.json      # Windows cmd: copy config.example.json 
 
 - `accounts`: a short label for each Gmail address. Use as many or as few as you like.
 - `query`: any Gmail search query, e.g. `in:inbox newer_than:2d` or `is:unread`.
-- `limit`: max emails fetched per account per run. Lower it while testing to save time.
+- `limit`: max new (not yet classified) emails per account per run (1-500). Lower it while testing to save time.
 - `hide_after`: days before an unhandled email of that priority leaves the Inbox (`null` = never). Optional; these are the defaults.
 
 All of these can also be changed in the web app under **Settings**.
@@ -182,22 +182,55 @@ Open **http://127.0.0.1:5000**. The app only accepts connections from your own c
 - **Inbox:** emails grouped by priority, newest first, with the model's reason. Emails from the latest run are tagged **New**.
 - **Row actions** (on hover): **Open in Gmail**, **Priority**, **Done**, **Ignore**. Done and Ignore can be undone.
 - **Completed / Ignored:** everything you've handled, with **Restore**.
-- **Accounts** (sidebar): show one account at a time.
-- **Run now:** fetches and classifies new emails, with live progress. The title row shows when it last checked and how fast the model ran (seconds per email, tokens/s). The terminal prints the same numbers for each email.
+- **Search:** the box above the list filters by sender, subject, reason or account as you type.
+- **Accounts** (sidebar): show one account at a time. **Show → New from last run** narrows the Inbox to what the latest run added.
+- **Run now:** fetches and classifies new emails, with a progress bar and live status ("Classifying 8 of 20 new"). The title row shows when it last checked and how fast the model ran (seconds per email, tokens/s). Per-email timings go to the terminal and to `data/speed.log` (see [Speed log](#speed-log)).
 - **Dark mode:** the moon / sun button in the sidebar, or **Settings → Appearance** to follow your system.
 - **Older:** unhandled emails past a cutoff (by default low after 2 days, medium after 10, high never) leave the priority groups and move to **Older**, collapsed at the bottom of the Inbox. Nothing is deleted. Change the days in **Settings → Hide old emails**.
+- **Dataset:** build a labelled dataset for training your own classifier (see [Dataset](#dataset)).
 - **Settings:** add or remove accounts, sign in to each one, change the Gmail search (with a time-range picker and examples), the limit, and the hide-old cutoffs. Saved to `config.json`.
-- **Priority:** wrong call? Hover a row, click the **Priority** button (⇅), pick the right level and optionally say why. Corrections are shown to the model as examples on the next run. Correct the same sender twice and you'll be offered a **sender rule** that skips the model for that sender. Manage both in Settings.
+- **Priority:** wrong call? Hover a row, click the **Priority** button (⇅), pick the right level and optionally say why. Corrections are shown to the model as examples on the next run. Tick **Use this note for every email from this sender** to turn the note into a **sender instruction** (e.g. "High only if it's about an interview"), which the model sees for every email from that sender. Correct the same sender twice and you'll be offered a **sender rule** that skips the model for that sender. Manage all three in Settings.
 
 New user? You can skip steps 5 and 6 above: start `app.py`, open **Settings**, add your accounts and click **Sign in** on each.
 
 ### What a run does
 
-1. For each account, asks Gmail for the **newest** emails matching your search, up to `limit`.
-2. **Skips emails it has already classified**, so only new ones go to the model. Running twice in a row costs almost nothing.
-3. Classifies the new ones and adds them to `data/results.json`.
+1. For each account, lists the emails matching your search, newest first, and **skips ones it has already classified**.
+2. Downloads and classifies up to `limit` of the rest, and adds them to `data/results.json`.
+3. If more are left, the next run continues with them. So widening the search (say from 1 day to 2 months) catches up on older mail over a few runs. Running twice in a row with nothing new costs almost nothing.
 
-Nothing in Gmail changes: the app can't mark, move or delete email. If more than `limit` new emails arrive between runs, the oldest of them are never fetched; raise the limit or run more often.
+Nothing in Gmail changes: the app can't mark, move or delete email.
+
+**Model loading:** starting `app.py` loads the model in the background, so the first Run now doesn't wait for it (about 20 s on first load). Ollama keeps it in memory for 5 minutes after the last request, then frees it. Change `KEEP_ALIVE` in `triage.py` to keep it longer.
+
+### Dataset
+
+The **Dataset** tab collects confirmed priorities in `data/labels.json`, for training and testing your own classifier against the model.
+
+- **Review:** one email at a time, in random order, with the model's answer. Pick a **type** (its letter key), then a priority: `1` High, `2` Medium, `3` Low (starts on the model's pick), then `Enter` or **Confirm** to save. `S` skip, `U` undo. The subject opens the email in Gmail. Judge each email as of when it arrived. Priority fixes from the Inbox are saved as labels too. **All labelled emails** (under Labels) lists every label, newest first, with type, your label, the model's and train / test / made-up.
+- **What the model sees:** under the controls, the exact sender, subject, preview and first 1,000 characters of body the model gets, loaded live from Gmail (read-only) and never stored. **Full prompt** shows the instructions, correction examples and sender instruction as they'd be today.
+- **Collect more:** fetch and classify up to N not-yet-classified emails per account for a range you pick (1 month to 1 year), without changing Settings. Collected emails go to Review only, never the Inbox, and don't change what counts as New.
+- **Types:** one per line, editable in the Dataset tab. Defaults: career, school: classes, school: admin, housing / landlord, money, security / account, clubs / events, personal, social / notifications, newsletter / promo, other. Pick by what the email is about; the sender breaks ties (a mass email from the registrar is school: admin). Split a type ("career: interview") only once it has about 100 examples.
+- **Test split:** a fixed ~20% of your real emails (picked by a hash of the email ID, so it never changes) are marked `test`. Never train on them; compare models on them.
+- **Labels:** counts per priority for train, test and made-up emails, plus how often the model agreed with you.
+- **Import made-up emails:** a JSON file of generated emails for types your inbox doesn't have yet. They're always `train`, never `test`. Importing the same file twice adds nothing.
+  ```json
+  {"emails": [{"from": "Recruiter <jobs@acme.com>", "subject": "Interview next week",
+               "body": "...", "label": "high", "type": "internship"}]}
+  ```
+
+Labels from your emails store sender, subject, date, type and both priorities, never the body. Made-up emails keep their body, since they're not real.
+
+### Speed log
+
+Every email the model classifies adds a line to `data/speed.log` (sender rules skip the model, so they don't):
+
+```
+2026-11-18 23:19:44  work 3/20 [18f2a9c01b4e7d33]: 0.9s (load 0.0s), 41 tokens, 45.2 tok/s
+2026-11-18 23:19:58  Run 2026-11-18T23:19:30 done: 20 emails, 18s total, 0.9s per email, 45 tok/s
+```
+
+The bracketed value is the Gmail message ID, the same `id` as in `data/results.json`, so you can match timings to emails. The file has no email content. Watch it live with `Get-Content data\speed.log -Wait -Tail 20`. Open one email in Gmail with `https://mail.google.com/mail/u/0/#all/<id>`.
 
 **Where old emails are kept:** everything ever classified stays in `data/results.json` (sender, subject, date, priority and reason; never the body). Done / Ignored, hiding and Older only change what the app shows. Deleting `data/results.json` starts fresh: the next run reclassifies whatever your search returns.
 
@@ -237,7 +270,7 @@ On macOS / Linux, use cron instead:
 | `config.json not found` | Copy `config.example.json` to `config.json` and fill in your accounts (step 5). |
 | `ConnectionError` to `localhost:11434` | Ollama isn't running. Start it with `ollama serve`. |
 | `model not found` | Run `ollama pull gemma4:e4b`. |
-| Fewer emails than expected | Raise the limit in **Settings** (or `"limit"` in `config.json`), or widen the query (e.g. `newer_than:3d`). |
+| Fewer emails than expected | Widen the query (e.g. `newer_than:3d`) or run again: each run classifies up to `limit` new emails per account and the next continues from there. |
 | Classifying is slow | Check `ollama ps`. If it says `100% CPU`, see **Optional: run the model on your GPU**. |
 
 ## Privacy and security
@@ -266,8 +299,8 @@ On macOS / Linux, use cron instead:
 - An unexpected priority value from the model (anything other than high / medium / low) is saved but not shown in any group.
 - **Open in Gmail** uses a link format Google doesn't officially document. It could stop working.
 - Tokens expire after 7 days while the OAuth app is in Testing mode, so you have to run `python login.py` about once a week.
-- Only plain-text email bodies are read. HTML-only emails are classified from the subject and preview. Bodies are cut off at 1,000 characters.
-- `results.json` grows forever. Older only hides emails in the app; nothing is removed from the file. The static digest (`data/digest.html`) still shows every unhandled email.
+- Bodies are cut off at 1,000 characters. Attachments are never read.
+- `results.json` and `speed.log` grow forever. Older only hides emails in the app; nothing is removed from `results.json`. The static digest (`data/digest.html`) still shows every unhandled email.
 
 ## Roadmap
 
@@ -275,3 +308,7 @@ On macOS / Linux, use cron instead:
 - Deadline detection, so emails stay until a few days after their deadline
 - Retry and clearer errors when Ollama is down or returns bad output
 - Keyboard shortcuts (`j` / `k`, `e` for Done)
+- Edit corrections and sender instructions in place
+- Train a small classifier on `data/labels.json` (local embeddings + scikit-learn) and compare it with the model on the test split
+- Custom sections (e.g. "Internship updates") with their own instructions, next to priority
+- "Ask your inbox": questions answered by the local model over your stored emails

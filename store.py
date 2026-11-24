@@ -10,10 +10,18 @@ ACTIONS = DATA / "actions.json"   # done / ignored, written only by the UI
 META = DATA / "meta.json"         # last run time and count
 CORRECTIONS = DATA / "corrections.json"   # your priority fixes, written only by the UI
 RULES = DATA / "rules.json"               # sender -> priority, written only by the UI
+LABELS = DATA / "labels.json"             # your confirmed priorities (training data), written only by the UI
 CONFIG = BASE / "config.json"
 # days after which an email leaves the Inbox (still kept in results.json); None = never
 DEFAULT_HIDE_AFTER = {"high": None, "medium": 10, "low": 2}
-DEFAULT_CONFIG = {"accounts": {}, "query": "in:inbox newer_than:1d", "limit": 20, "hide_after": DEFAULT_HIDE_AFTER}
+# email types for dataset labels: pick by what the email is about, sender breaks ties.
+# Split a type ("career: interview") only once it has ~100 examples.
+DEFAULT_TYPES = [
+    "career", "school: classes", "school: admin", "housing / landlord", "money", "security / account",
+    "clubs / events", "personal", "social / notifications", "newsletter / promo", "other",
+]
+DEFAULT_CONFIG = {"accounts": {}, "query": "in:inbox newer_than:1d", "limit": 20, "hide_after": DEFAULT_HIDE_AFTER,
+                  "types": DEFAULT_TYPES}
 
 
 def read_json(path, default):
@@ -66,8 +74,9 @@ def save_corrections(corrections):
 
 
 def load_rules():
-    # {"rules": {"<sender address>": "high" | "medium" | "low"}, "declined": [<addresses not to suggest again>]}
-    return read_json(RULES, {"rules": {}, "declined": []})
+    # {"rules": {"<sender address>": "high" | "medium" | "low"}, "declined": [<addresses not to suggest again>],
+    #  "notes": {"<sender address>": "instruction added to the prompt for this sender"}}
+    return {"rules": {}, "declined": [], "notes": {}, **read_json(RULES, {})}
 
 
 def save_rules(rules):
@@ -83,6 +92,15 @@ def effective_priority(r, corrections, rules):
     if rule:
         return rule, "rule"
     return r["priority"], "model"
+
+
+def load_labels():
+    # {"<account>:<id>" or "synthetic:<hash>": {"label", "model", "source", "split", "from", "subject", "date", ...}}
+    return read_json(LABELS, {})
+
+
+def save_labels(labels):
+    write_json(LABELS, labels, indent=2)
 
 
 def load_meta():
